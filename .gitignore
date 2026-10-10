@@ -138,3 +138,10 @@ citylinks-backend/prisma/data.db-journal
 # Python (in case)
 __pycache__/
 *.py[cod]
+
+# AI Agent & IDE configs
+.agents/
+.claude/
+.cursor/
+.devin/
+
