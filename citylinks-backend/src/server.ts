@@ -6,15 +6,40 @@ import { PrismaClient } from '@prisma/client';
 dotenv.config();
 
 const app = express();
-const prisma = new PrismaClient();
+import { prisma } from './lib/prisma';
 const PORT = process.env.PORT || 5000;
 
 import authRoutes from './routes/auth';
+import marketplaceRoutes from './routes/marketplace';
+import shopRoutes from './routes/shops';
+import serviceRoutes from './routes/services';
+import transportRoutes from './routes/transport';
+import dealRoutes from './routes/deals';
+import cartRoutes from './routes/cart';
+import notificationRoutes from './routes/notifications';
+import joinRequestsRoutes from './routes/joinRequests';
+import adminRoutes from './routes/admin';
+import orderRoutes from './routes/orders';
+import { seedAll } from '../prisma/seed';
+
+// Ensure database is completely seeded on startup
+seedAll().catch((err) => console.error('[Server Seed Error]:', err));
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
 app.use('/api/auth', authRoutes);
+app.use('/api/marketplace', marketplaceRoutes);
+app.use('/api/shops', shopRoutes);
+app.use('/api/services', serviceRoutes);
+app.use('/api/transport', transportRoutes);
+app.use('/api/deals', dealRoutes);
+app.use('/api/cart', cartRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/join-requests', joinRequestsRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/orders', orderRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'CityLinks API is running' });
@@ -30,7 +55,7 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
-// Background job: Delete unverified users older than 1 hour to keep DB clean
+// Background job: Delete unverified users older than 1 hour and notifications older than 24 hours
 // Runs every hour
 setInterval(async () => {
   try {
@@ -45,6 +70,20 @@ setInterval(async () => {
     });
     if (result.count > 0) {
       console.log(`[Cleanup] Deleted ${result.count} unverified users older than 1 hour.`);
+    }
+
+    const now = new Date();
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const notifResult = await prisma.notification.deleteMany({
+      where: {
+        OR: [
+          { expiresAt: { lte: now } },
+          { expiresAt: null, createdAt: { lt: twentyFourHoursAgo } },
+        ],
+      },
+    });
+    if (notifResult.count > 0) {
+      console.log(`[Cleanup] Purged ${notifResult.count} expired notifications.`);
     }
   } catch (error) {
     console.error("[Cleanup Error]:", error);

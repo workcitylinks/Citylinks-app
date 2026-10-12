@@ -4,20 +4,28 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  password     String
-  fullName     String?
-  role         Role     @default(CUSTOMER)
-  isVerified   Boolean  @default(false)
-  otp          String?
-  otpExpiresAt DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  fullName      String?
+  firstName     String?
+  lastName      String?
+  phone         String?
+  address       String?
+  aadhaarNumber String?
+  panNumber     String?
+  role          Role      @default(CUSTOMER)
+  isVerified    Boolean   @default(false)
+  otp           String?
+  otpExpiresAt  DateTime?
+  cart          Cart?
+  notifications Notification[]
+  joinRequests  JoinRequest[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
 enum Role {
@@ -25,4 +33,302 @@ enum Role {
   MERCHANT
   LABOR
   TRANSPORT
+  SUPER_ADMIN
+  DEVELOPER
+}
+
+model MarketplaceItem {
+  id          String   @id @default(uuid())
+  entity_type String   // product, service, transport, shop
+  entity_id   String
+  title       String
+  subtitle    String
+  link_url    String   @default("")
+  badge       String   @default("")
+  price_label String?
+  popularity  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([popularity(sort: Desc)])
+  @@index([entity_type])
+}
+
+model Shop {
+  id          String    @id @default(uuid())
+  name        String
+  category    String    @default("Retail") // Retail, Grocery, Electronics, etc.
+  location    String    // e.g. Haveri Region
+  phone       String    // e.g. 9449084242
+  email       String?   @default("sachi.hvr@gmail.com")
+  status      String    @default("Approved") // Approved, Pending, etc.
+  latitude    Float?
+  longitude   Float?
+  address     String?
+  rating      Float?    @default(4.5)
+  reviewCount Int?      @default(120)
+  isPopular   Boolean   @default(false)
+  isFeatured  Boolean   @default(false)
+  isSponsored Boolean   @default(false)
+  imageUrl    String?
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([category])
+  @@index([status])
+  @@index([isPopular])
+  @@index([isFeatured])
+  @@index([isSponsored])
+  @@index([rating(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
+}
+
+model Product {
+  id          String    @id @default(uuid())
+  shopId      String
+  shop        Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name        String    // e.g. "Nut"
+  description String?   // e.g. "Nut"
+  price       Float     @default(0)
+  unit        String    @default("piece") // piece, kg, pack, box, etc.
+  stock       Int       @default(100)
+  imageUrl    String?
+  isActive    Boolean    @default(true)
+  cartItems   CartItem[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([shopId])
+  @@index([isActive])
+}
+
+model Service {
+  id          String   @id @default(uuid())
+  title       String
+  category    String   // Plumbing, Electrician, Cleaning, Painting, Salon, Carpentry, General
+  providerName String
+  phone       String?
+  rating      Float?   @default(4.8)
+  reviewCount Int?     @default(150)
+  isFeatured  Boolean  @default(false)
+  isPopular   Boolean  @default(false)
+  isSponsored Boolean  @default(false)
+  priceLabel  String   // e.g. ₹299 onwards
+  location    String   @default("Haveri Region")
+  description String?
+  isAvailable Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+  @@index([isAvailable])
+  @@index([isFeatured])
+  @@index([isPopular])
+  @@index([isSponsored])
+  @@index([rating(sort: Desc)])
+}
+
+model TransportProvider {
+  id          String   @id @default(uuid())
+  name        String
+  type        String   // passenger or commercial
+  vehicleType String   // Auto Rickshaw, Bike Taxi, Car, Tata Ace, Pickup Truck, Tempo
+  phone       String
+  location    String   @default("Haveri Region")
+  fareLabel   String   // e.g. ₹30–₹150
+  eta         String   @default("5–15 min")
+  rating      Float?   @default(4.7)
+  isAvailable Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([type])
+  @@index([isAvailable])
+  @@index([rating(sort: Desc)])
+}
+
+model VehicleCategory {
+  id          String   @id @default(uuid())
+  name        String
+  desc        String
+  fare        String
+  eta         String
+  type        String   // passenger or commercial
+  iconName    String   // Car, Bike, Truck
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([type])
+}
+
+model Deal {
+  id          String   @id @default(uuid())
+  title       String
+  discount    String   // e.g. 30% OFF, Buy 1 Get 1
+  category    String   // Shopping, Services, Food, Electronics
+  merchantName String
+  validUntil  String?
+  linkUrl     String?  @default("")
+  imageUrl    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([category])
+}
+
+model DigitalService {
+  id          String   @id @default(uuid())
+  name        String
+  desc        String
+  badge       String?
+  color       String   @default("#2563eb")
+  iconName    String   // Globe, FileText, Palette, Target, Server, TrendingUp, Users, Megaphone, Laptop, MoreHorizontal
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+}
+
+model DigitalServiceProvider {
+  id          String   @id @default(uuid())
+  name        String   // Provider name e.g. "Rohit Web Studios"
+  serviceType String   // Category e.g. "Website Creation", "Blog & Content writing", "Other", etc.
+  phone       String?  // Contact phone number e.g. "9845112244"
+  rating      Float?   @default(4.9)
+  priceLabel  String   // e.g. "₹2,999 onwards"
+  location    String   @default("Haveri Region")
+  description String?
+  isAvailable Boolean  @default(true)
+  badge       String?  @default("Verified")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([serviceType])
+  @@index([isAvailable])
+  @@index([rating(sort: Desc)])
+}
+
+model CategoryTile {
+  id          String   @id @default(uuid())
+  name        String
+  type        String   // service_tile or shop_category
+  color       String   @default("#3b82f6")
+  iconName    String   // Car, Truck, Wrench, Zap, PaintBucket, Home, Scissors, Sparkles, ShoppingBag
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([type])
+}
+
+model FeaturedService {
+  id          String   @id @default(uuid())
+  name        String
+  provider    String
+  rating      Float    @default(4.8)
+  reviews     Int      @default(150)
+  price       String
+  tag         String   @default("Top Rated")
+  emoji       String   @default("✨")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([rating(sort: Desc)])
+}
+
+model Cart {
+  id        String     @id @default(uuid())
+  userId    String     @unique
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([userId])
+}
+
+model CartItem {
+  id        String   @id @default(uuid())
+  cartId    String
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cartId, productId])
+  @@index([cartId])
+  @@index([productId])
+}
+
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String?   // null means broadcast to all users (sent by Super Admin)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String    @default("info") // info, promo, order, alert
+  isRead    Boolean   @default(false)
+  expiresAt DateTime? // Custom deletion/expiry time configured by Super Admin (defaults to 24h)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([expiresAt])
+  @@index([createdAt(sort: Desc)])
+}
+
+model JoinRequest {
+  id            String    @id @default(uuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shopName      String
+  description   String
+  role          Role      // MERCHANT, LABOR, TRANSPORT
+  serviceType   String?   // e.g. Xerox / Document Printing, Graphic Design, Web Development & IT, etc.
+  customService String?   // if serviceType is 'Other'
+  location      String
+  phone         String
+  email         String
+  imageUrl      String?   // Optional photo from camera or gallery
+  status        String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  approvedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([role])
+}
+
+model Order {
+  id             String    @id
+  userId         String
+  userName       String?
+  userPhone      String?
+  userAddress    String?
+  userLatitude   Float?
+  userLongitude  Float?
+  shopId         String
+  shopName       String?
+  items          Json
+  subtotal       Float
+  deliveryFee    Float
+  totalAmount    Float
+  paymentMethod  String
+  paymentStatus  String
+  transactionRef String?
+  orderStatus    String
+  createdAt      DateTime? @default(now())
+  updatedAt      DateTime? @updatedAt
+
+  @@index([userId])
+  @@index([shopId])
+  @@index([orderStatus])
+  @@index([createdAt(sort: Desc)])
 }

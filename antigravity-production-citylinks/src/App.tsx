@@ -47,6 +47,7 @@ import BookTransportPage from "./pages/customer/BookTransportPage.tsx";
 import ShopDetailPage from "./pages/customer/ShopDetailPage.tsx";
 import SearchPage from "./pages/customer/SearchPage.tsx";
 import DealsPage from "./pages/customer/DealsPage.tsx";
+import DigitalServicesPage from "./pages/customer/DigitalServicesPage.tsx";
 
 const queryClient = new QueryClient();
 
@@ -96,6 +97,8 @@ const App = () => (
               <Route path="/transportation/profile" element={<TransportationProfile />} />
               <Route path="/deals" element={<DealsPage />} />
               <Route path="/services" element={<ServicesPage />} />
+              <Route path="/digital-services" element={<DigitalServicesPage />} />
+              <Route path="/digital" element={<DigitalServicesPage />} />
               <Route path="/book-transport" element={<BookTransportPage />} />
               <Route path="/transport" element={<TransportationPage />} />
               <Route path="/shop/:id" element={<ShopDetailPage />} />

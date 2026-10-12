@@ -25,11 +25,14 @@ import {
   ShoppingCart,
   Plus,
   Minus,
-  
+
   Package,
   Bike,
   Users,
   CheckCircle2,
+  Laptop,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -81,12 +84,17 @@ const featuredServices = [
   { name: "Home Deep Cleaning", provider: "SparkleClean Pro", rating: 4.7, reviews: 189, price: "₹999", image: "✨", tag: "Popular" },
   { name: "Electrician Visit", provider: "PowerFix Hub", rating: 4.9, reviews: 312, price: "₹199", image: "⚡", tag: "Trending" },
   { name: "Plumbing Repair", provider: "PipeMaster", rating: 4.6, reviews: 156, price: "₹249", image: "🔧", tag: "Best Value" },
+  { name: "Sofa & Carpet Cleaning", provider: "FreshHome Living", rating: 4.8, reviews: 145, price: "₹499", image: "🛋️", tag: "Popular" },
+  { name: "Water Purifier Service", provider: "AquaPure Solutions", rating: 4.7, reviews: 198, price: "₹299", image: "💧", tag: "Verified" },
+  { name: "Washing Machine Repair", provider: "ApplianceCare 24/7", rating: 4.9, reviews: 210, price: "₹349", image: "🧺", tag: "Top Rated" },
+  { name: "Pest Control Treatment", provider: "SafeGuard Pest Pro", rating: 4.8, reviews: 167, price: "₹799", image: "🛡️", tag: "Trending" },
 ];
 
 const quickActions = [
-  { label: "Nearby Shops", icon: MapPin, description: "Find stores around you", action: "shops" },
+  { label: "Near by Shops", icon: MapPin, description: "Find stores around you", action: "shops" },
   { label: "Book Service", icon: Wrench, description: "Hire local professionals", action: "services" },
-  { label: "Transport", icon: Car, description: "Rides & delivery", action: "transport" },
+  { label: "Digital Services", icon: Laptop, description: "Make your work digital", action: "digital" },
+  { label: "Transport", icon: Car, description: "Rides & delivery that you can trust on", action: "transport" },
   { label: "Deals & Offers", icon: TrendingUp, description: "Today's best deals", action: "deals" },
 ];
 
@@ -130,7 +138,7 @@ interface PopularItem {
 const CustomerDashboard = () => {
   const navigate = useNavigate();
   const { user, roles, loading: authLoading } = useAuth();
-  
+
   const [searchQuery, setSearchQuery] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showCart, setShowCart] = useState(false);
@@ -331,6 +339,25 @@ const CustomerDashboard = () => {
 
   const popularDiscoveryItems = popularItems.length > 0 ? popularItems : fallbackPopularItems;
 
+  // Pagination for Featured (4 at a time) and Popular near you (4 at a time)
+  const [featuredPage, setFeaturedPage] = useState(1);
+  const [popularPage, setPopularPage] = useState(1);
+
+  const displayFeaturedList = featuredAds.length > 0 ? featuredAds : featuredServices;
+  const totalFeaturedPages = Math.max(1, Math.ceil(displayFeaturedList.length / 4));
+  const paginatedFeatured = displayFeaturedList.slice((featuredPage - 1) * 4, featuredPage * 4);
+
+  const totalPopularPages = Math.max(1, Math.ceil(popularDiscoveryItems.length / 4));
+  const paginatedPopular = popularDiscoveryItems.slice((popularPage - 1) * 4, popularPage * 4);
+
+  useEffect(() => {
+    if (featuredPage > totalFeaturedPages) setFeaturedPage(totalFeaturedPages);
+  }, [totalFeaturedPages, featuredPage]);
+
+  useEffect(() => {
+    if (popularPage > totalPopularPages) setPopularPage(totalPopularPages);
+  }, [totalPopularPages, popularPage]);
+
   const handleDiscoveryNavigation = (linkUrl?: string | null) => {
     if (!linkUrl) return;
 
@@ -431,7 +458,7 @@ const CustomerDashboard = () => {
 
   // Build professional portal cards - only show cards relevant to the user
   const professionalPortals = [];
-  
+
   // If user has a professional role, only show their portal
   if (hasProfessionalRole) {
     if (roles.includes("merchant" as any)) {
@@ -444,7 +471,7 @@ const CustomerDashboard = () => {
       professionalPortals.push({ title: "Transport Hub", desc: "Rides, deliveries & fleet management", icon: Truck, route: "/transportation", color: "text-portal-transportation" });
     }
   }
-  
+
   // Employee portal only for @citylinks.in emails or users with employee role
   if (isStaffEmail || hasEmployeeRole) {
     professionalPortals.push({ title: "Employee Portal", desc: "Operations & management dashboard", icon: Shield, route: "/employee", color: "text-portal-employee" });
@@ -569,365 +596,447 @@ const CustomerDashboard = () => {
           </div>
         ) : (
           <>
-        {/* Hero section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="pt-6 pb-6 sm:pt-10 sm:pb-8"
-        >
-          <h1 className="font-display text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-2">
-            What do you need <span className="text-gradient-hero">today</span>?
-          </h1>
-          <p className="text-muted-foreground text-sm sm:text-base">
-            Services, products, and more — all from your neighbourhood
-          </p>
-        </motion.div>
-        {/* Quick actions */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-10"
-        >
-          {quickActions.map((action) => (
+            {/* Hero section */}
             <motion.div
-              key={action.label}
-              whileHover={{ y: -4 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={() => {
-                if (action.action === "shops") navigate("/shops");
-                if (action.action === "services") navigate("/services");
-                if (action.action === "transport") navigate("/book-transport");
-                if (action.action === "deals") navigate("/deals");
-              }}
-              className="glass rounded-2xl p-4 cursor-pointer group transition-all duration-200 hover:shadow-lg"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="pt-6 pb-6 sm:pt-10 sm:pb-8"
             >
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/20 transition-colors">
-                <action.icon className="w-5 h-5 text-primary" />
-              </div>
-              <p className="font-semibold text-sm text-foreground">{action.label}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{action.description}</p>
+              <h1 className="font-display text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-2">
+                What do you need <span className="text-gradient-hero">today</span>?
+              </h1>
+              <p className="text-muted-foreground text-sm sm:text-base">
+                Services, products, and more — all from your neighbourhood
+              </p>
             </motion.div>
-          ))}
-        </motion.div>
-
-        {/* Online Products from Merchants */}
-        {products && products.length > 0 && (
-          <motion.section
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.15 }}
-            className="mb-10"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-display text-lg sm:text-xl font-bold text-foreground">
-                <ShoppingCart className="w-5 h-5 inline mr-2 text-primary" />
-                Shop Online
-              </h2>
-              {cart.length > 0 && (
-                <Button
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => { setShowCart(true); setCheckoutStep("cart"); }}
+            {/* Quick actions */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-10"
+            >
+              {quickActions.map((action) => (
+                <motion.div
+                  key={action.label}
+                  whileHover={{ y: -4 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => {
+                    if (action.action === "shops") navigate("/shops");
+                    if (action.action === "services") navigate("/services");
+                    if (action.action === "transport") navigate("/book-transport");
+                    if (action.action === "deals") navigate("/deals");
+                    if (action.action === "digital") navigate("/digital-services");
+                  }}
+                  className="glass rounded-2xl p-4 cursor-pointer group transition-all duration-200 hover:shadow-lg"
                 >
-                  <ShoppingCart className="w-4 h-4" />
-                  Cart ({cart.reduce((s, i) => s + i.quantity, 0)}) — ₹{cartTotal}
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-primary/20 transition-colors">
+                    <action.icon className="w-5 h-5 text-primary" />
+                  </div>
+                  <p className="font-semibold text-sm text-foreground">{action.label}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{action.description}</p>
+                </motion.div>
+              ))}
+            </motion.div>
+
+            {/* Online Products from Merchants */}
+            {products && products.length > 0 && (
+              <motion.section
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.15 }}
+                className="mb-10"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="font-display text-lg sm:text-xl font-bold text-foreground">
+                    <ShoppingCart className="w-5 h-5 inline mr-2 text-primary" />
+                    Shop Online
+                  </h2>
+                  {cart.length > 0 && (
+                    <Button
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => { setShowCart(true); setCheckoutStep("cart"); }}
+                    >
+                      <ShoppingCart className="w-4 h-4" />
+                      Cart ({cart.reduce((s, i) => s + i.quantity, 0)}) — ₹{cartTotal}
+                    </Button>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {products.map((product, i) => {
+                    const inCart = cart.find((c) => c.id === product.id);
+                    return (
+                      <motion.div
+                        key={product.id}
+                        initial={{ opacity: 0, y: 15 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.05 }}
+                        className="glass rounded-2xl p-4 space-y-2"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm text-foreground truncate">{product.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">{getMerchantName(product.merchant_id)}</p>
+                          </div>
+                        </div>
+                        {product.description && (
+                          <p className="text-xs text-muted-foreground line-clamp-2">{product.description}</p>
+                        )}
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="font-bold text-sm text-primary">₹{Number(product.price).toLocaleString()}</span>
+                          <span className="text-xs text-muted-foreground">/{product.unit}</span>
+                        </div>
+                        {inCart ? (
+                          <div className="flex items-center justify-center gap-3 pt-1">
+                            <Button size="icon" variant="outline" className="w-7 h-7" onClick={() => updateQty(product.id, -1)}>
+                              <Minus className="w-3 h-3" />
+                            </Button>
+                            <span className="text-sm font-bold text-foreground w-6 text-center">{inCart.quantity}</span>
+                            <Button size="icon" variant="outline" className="w-7 h-7" onClick={() => updateQty(product.id, 1)}>
+                              <Plus className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button size="sm" variant="outline" className="w-full gap-1 text-xs" onClick={() => addToCart(product)}>
+                            <Plus className="w-3 h-3" /> Add to Cart
+                          </Button>
+                        )}
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </motion.section>
+            )}
+
+            {/* Services section */}
+            <motion.section
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="mb-10"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-display text-lg sm:text-xl font-bold text-foreground">
+                  Services at your doorstep
+                </h2>
+                <Button variant="ghost" size="sm" className="gap-1 text-primary text-xs" onClick={() => navigate("/services")}>
+                  View All <ArrowRight className="w-3.5 h-3.5" />
                 </Button>
-              )}
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              {products.map((product, i) => {
-                const inCart = cart.find((c) => c.id === product.id);
-                return (
+              </div>
+
+              <div className="relative">
+                <div className="hidden sm:block pointer-events-none absolute bottom-4 left-1/4 top-4 w-px -translate-x-1/2 bg-border/40" />
+                <div className="hidden sm:block pointer-events-none absolute bottom-4 left-3/4 top-4 w-px -translate-x-1/2 bg-border/40" />
+
+                <div className="grid grid-cols-4 gap-3 sm:grid-cols-8 sm:gap-4">
+                  {serviceTiles.map((cat, index) => (
+                    <motion.div
+                      key={cat.name}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: index * 0.04 + 0.3 }}
+                      whileHover={{ y: -4 }}
+                      onClick={() => {
+                        const catLower = cat.name.toLowerCase();
+                        if (catLower === "transport" || catLower === "moving") {
+                          navigate("/book-transport");
+                        } else {
+                          navigate(`/services?category=${catLower}`);
+                        }
+                      }}
+                      className="flex min-w-0 flex-col items-center gap-2 text-center cursor-pointer group"
+                    >
+                      <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${cat.color} transition-all group-hover:scale-110 sm:h-16 sm:w-16`}>
+                        <cat.icon className="w-5 h-5 sm:w-7 sm:h-7" />
+                      </div>
+                      <span className="text-[10px] font-medium leading-tight text-foreground sm:text-xs">{cat.name}</span>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            </motion.section>
+
+            {/* Shop categories */}
+            <motion.section
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="mb-10"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-display text-lg sm:text-xl font-bold text-foreground">
+                  Shop by category
+                </h2>
+                <Button variant="ghost" size="sm" className="gap-1 text-primary text-xs" onClick={() => navigate("/shops")}>
+                  View All <ArrowRight className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {shopCategories.map((cat, i) => (
                   <motion.div
-                    key={product.id}
+                    key={cat.name}
                     initial={{ opacity: 0, y: 15 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                    className="glass rounded-2xl p-4 space-y-2"
+                    transition={{ delay: i * 0.05 + 0.35 }}
+                    whileHover={{ y: -4 }}
+                    onClick={() => navigate("/shops")}
+                    className="glass rounded-2xl p-4 flex items-center gap-3 cursor-pointer group hover:shadow-lg transition-all"
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm text-foreground truncate">{product.name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{getMerchantName(product.merchant_id)}</p>
-                      </div>
+                    <div className={`w-12 h-12 rounded-xl ${cat.color} flex items-center justify-center flex-shrink-0`}>
+                      <cat.icon className="w-6 h-6" />
                     </div>
-                    {product.description && (
-                      <p className="text-xs text-muted-foreground line-clamp-2">{product.description}</p>
-                    )}
-                    <div className="flex items-center justify-between pt-1">
-                      <span className="font-bold text-sm text-primary">₹{Number(product.price).toLocaleString()}</span>
-                      <span className="text-xs text-muted-foreground">/{product.unit}</span>
+                    <div>
+                      <p className="font-semibold text-sm text-foreground">{cat.name}</p>
+                      <p className="text-xs text-muted-foreground">Explore →</p>
                     </div>
-                    {inCart ? (
-                      <div className="flex items-center justify-center gap-3 pt-1">
-                        <Button size="icon" variant="outline" className="w-7 h-7" onClick={() => updateQty(product.id, -1)}>
-                          <Minus className="w-3 h-3" />
-                        </Button>
-                        <span className="text-sm font-bold text-foreground w-6 text-center">{inCart.quantity}</span>
-                        <Button size="icon" variant="outline" className="w-7 h-7" onClick={() => updateQty(product.id, 1)}>
-                          <Plus className="w-3 h-3" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button size="sm" variant="outline" className="w-full gap-1 text-xs" onClick={() => addToCart(product)}>
-                        <Plus className="w-3 h-3" /> Add to Cart
-                      </Button>
-                    )}
                   </motion.div>
-                );
-              })}
-            </div>
-          </motion.section>
-        )}
+                ))}
+              </div>
+            </motion.section>
 
-        {/* Services section */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="mb-10"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display text-lg sm:text-xl font-bold text-foreground">
-              Services at your doorstep
-            </h2>
-            <Button variant="ghost" size="sm" className="gap-1 text-primary text-xs" onClick={() => navigate("/services")}>
-              View All <ArrowRight className="w-3.5 h-3.5" />
-            </Button>
-          </div>
-
-          <div className="relative">
-            <div className="hidden sm:block pointer-events-none absolute bottom-4 left-1/4 top-4 w-px -translate-x-1/2 bg-border/40" />
-            <div className="hidden sm:block pointer-events-none absolute bottom-4 left-3/4 top-4 w-px -translate-x-1/2 bg-border/40" />
-
-            <div className="grid grid-cols-4 gap-3 sm:grid-cols-8 sm:gap-4">
-              {serviceTiles.map((cat, index) => (
-                <motion.div
-                  key={cat.name}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: index * 0.04 + 0.3 }}
-                  whileHover={{ y: -4 }}
-                  onClick={() => {
-                    const catLower = cat.name.toLowerCase();
-                    if (catLower === "transport" || catLower === "moving") {
-                      navigate("/book-transport");
-                    } else {
-                      navigate(`/services?category=${catLower}`);
-                    }
-                  }}
-                  className="flex min-w-0 flex-col items-center gap-2 text-center cursor-pointer group"
-                >
-                  <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${cat.color} transition-all group-hover:scale-110 sm:h-16 sm:w-16`}>
-                    <cat.icon className="w-5 h-5 sm:w-7 sm:h-7" />
+            {/* Featured / Ads section */}
+            <motion.section
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+              className="mb-10"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-display text-lg sm:text-xl font-bold text-foreground">
+                  <Sparkles className="w-5 h-5 inline mr-2 text-primary" />
+                  Featured
+                </h2>
+                {totalFeaturedPages > 1 && (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      disabled={featuredPage <= 1}
+                      onClick={() => setFeaturedPage((p) => Math.max(1, p - 1))}
+                      className="w-8 h-8 rounded-full flex items-center justify-center border border-border/60 bg-background/80 hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                      aria-label="Previous featured page"
+                    >
+                      <ChevronLeft className="w-4 h-4 text-foreground" />
+                    </button>
+                    <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-muted/60 text-muted-foreground">
+                      {featuredPage} / {totalFeaturedPages}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={featuredPage >= totalFeaturedPages}
+                      onClick={() => setFeaturedPage((p) => Math.min(totalFeaturedPages, p + 1))}
+                      className="w-8 h-8 rounded-full flex items-center justify-center border border-border/60 bg-background/80 hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                      aria-label="Next featured page"
+                    >
+                      <ChevronRight className="w-4 h-4 text-foreground" />
+                    </button>
                   </div>
-                  <span className="text-[10px] font-medium leading-tight text-foreground sm:text-xs">{cat.name}</span>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        </motion.section>
+                )}
+              </div>
 
-        {/* Shop categories */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-          className="mb-10"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display text-lg sm:text-xl font-bold text-foreground">
-              Shop by category
-            </h2>
-            <Button variant="ghost" size="sm" className="gap-1 text-primary text-xs" onClick={() => navigate("/shops")}>
-              View All <ArrowRight className="w-3.5 h-3.5" />
-            </Button>
-          </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {featuredAds.length > 0
+                  ? (paginatedFeatured as FeaturedAd[]).map((ad, i) => (
+                      <motion.div
+                        key={ad.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.08 + 0.1 }}
+                        whileHover={{ y: -4 }}
+                        onClick={() => handleDiscoveryNavigation(ad.link_url)}
+                        className="glass rounded-2xl p-5 cursor-pointer group hover:shadow-lg transition-all border border-primary/10"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <span className="text-3xl">{ad.image_url ? "📢" : "⭐"}</span>
+                          <Badge className="text-[10px] font-medium bg-primary/10 text-primary border-primary/20">
+                            Featured
+                          </Badge>
+                        </div>
+                        <h3 className="font-semibold text-sm text-foreground mb-1">{ad.title}</h3>
+                        <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{ad.description || ad.category}</p>
+                      </motion.div>
+                    ))
+                  : (paginatedFeatured as typeof featuredServices).map((service, i) => (
+                      <motion.div
+                        key={service.name}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.08 + 0.1 }}
+                        whileHover={{ y: -4 }}
+                        className="glass rounded-2xl p-5 cursor-pointer group hover:shadow-lg transition-all"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <span className="text-3xl">{service.image}</span>
+                          <Badge variant="secondary" className="text-[10px] font-medium">
+                            {service.tag}
+                          </Badge>
+                        </div>
+                        <h3 className="font-semibold text-sm text-foreground mb-1">{service.name}</h3>
+                        <p className="text-xs text-muted-foreground mb-3">{service.provider}</p>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1">
+                            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                            <span className="text-xs font-semibold text-foreground">{service.rating}</span>
+                            <span className="text-xs text-muted-foreground">({service.reviews})</span>
+                          </div>
+                          <span className="font-bold text-sm text-primary">{service.price}</span>
+                        </div>
+                      </motion.div>
+                    ))}
+              </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {shopCategories.map((cat, i) => (
-              <motion.div
-                key={cat.name}
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 + 0.35 }}
-                whileHover={{ y: -4 }}
-                onClick={() => navigate("/shops")}
-                className="glass rounded-2xl p-4 flex items-center gap-3 cursor-pointer group hover:shadow-lg transition-all"
-              >
-                <div className={`w-12 h-12 rounded-xl ${cat.color} flex items-center justify-center flex-shrink-0`}>
-                  <cat.icon className="w-6 h-6" />
+              {totalFeaturedPages > 1 && (
+                <div className="flex justify-center items-center gap-2 mt-4">
+                  {Array.from({ length: totalFeaturedPages }).map((_, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setFeaturedPage(idx + 1)}
+                      className={`h-2 rounded-full transition-all ${
+                        featuredPage === idx + 1 ? "w-6 bg-primary" : "w-2 bg-muted hover:bg-muted-foreground/30"
+                      }`}
+                      aria-label={`Go to featured page ${idx + 1}`}
+                    />
+                  ))}
                 </div>
-                <div>
-                  <p className="font-semibold text-sm text-foreground">{cat.name}</p>
-                  <p className="text-xs text-muted-foreground">Explore →</p>
+              )}
+            </motion.section>
+
+            <motion.section
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.45 }}
+              className="mb-10"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-display text-lg sm:text-xl font-bold text-foreground">
+                  <TrendingUp className="w-5 h-5 inline mr-2 text-primary" />
+                  Popular near you
+                </h2>
+                {totalPopularPages > 1 && (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      disabled={popularPage <= 1}
+                      onClick={() => setPopularPage((p) => Math.max(1, p - 1))}
+                      className="w-8 h-8 rounded-full flex items-center justify-center border border-border/60 bg-background/80 hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                      aria-label="Previous popular page"
+                    >
+                      <ChevronLeft className="w-4 h-4 text-foreground" />
+                    </button>
+                    <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-muted/60 text-muted-foreground">
+                      {popularPage} / {totalPopularPages}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={popularPage >= totalPopularPages}
+                      onClick={() => setPopularPage((p) => Math.min(totalPopularPages, p + 1))}
+                      className="w-8 h-8 rounded-full flex items-center justify-center border border-border/60 bg-background/80 hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                      aria-label="Next popular page"
+                    >
+                      <ChevronRight className="w-4 h-4 text-foreground" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {paginatedPopular.map((item, index) => {
+                  const Icon = item.entity_type === "transport"
+                    ? Truck
+                    : item.entity_type === "service"
+                      ? Wrench
+                      : item.entity_type === "shop"
+                        ? Store
+                        : ShoppingBag;
+
+                  return (
+                    <motion.div
+                      key={`${item.entity_type}-${item.entity_id}`}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.06 + 0.1 }}
+                      whileHover={{ y: -4 }}
+                      onClick={() => handleDiscoveryNavigation(item.link_url)}
+                      className="glass rounded-2xl p-5 cursor-pointer group hover:shadow-lg transition-all"
+                    >
+                      <div className="mb-3 flex items-start justify-between gap-3">
+                        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <Badge variant="secondary" className="text-[10px] font-medium">
+                          {item.badge}
+                        </Badge>
+                      </div>
+
+                      <h3 className="mb-1 text-sm font-semibold text-foreground">{item.title}</h3>
+                      <p className="mb-3 line-clamp-2 text-xs text-muted-foreground">{item.subtitle}</p>
+
+                      <div className="flex items-center justify-between gap-3 text-xs">
+                        <span className="font-medium text-primary">{item.price_label || `${item.popularity} orders`}</span>
+                        <span className="text-muted-foreground">{item.popularity > 0 ? `${item.popularity} orders` : "Trending"}</span>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+
+              {totalPopularPages > 1 && (
+                <div className="flex justify-center items-center gap-2 mt-4">
+                  {Array.from({ length: totalPopularPages }).map((_, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setPopularPage(idx + 1)}
+                      className={`h-2 rounded-full transition-all ${
+                        popularPage === idx + 1 ? "w-6 bg-primary" : "w-2 bg-muted hover:bg-muted-foreground/30"
+                      }`}
+                      aria-label={`Go to popular page ${idx + 1}`}
+                    />
+                  ))}
                 </div>
-              </motion.div>
-            ))}
-          </div>
-        </motion.section>
+              )}
+            </motion.section>
 
-        {/* Featured / Ads section */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-          className="mb-10"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display text-lg sm:text-xl font-bold text-foreground">
-              <Sparkles className="w-5 h-5 inline mr-2 text-primary" />
-              Featured
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {featuredAds.map((ad, i) => (
-              <motion.div
-                key={ad.id}
+            {/* Portal shortcuts for users who already have professional roles */}
+            {!authLoading && professionalPortals.length > 0 && (
+              <motion.section
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.08 + 0.45 }}
-                whileHover={{ y: -4 }}
-                onClick={() => handleDiscoveryNavigation(ad.link_url)}
-                className="glass rounded-2xl p-5 cursor-pointer group hover:shadow-lg transition-all border border-primary/10"
+                transition={{ duration: 0.5, delay: 0.5 }}
+                className="mb-10"
               >
-                <div className="flex items-start justify-between mb-3">
-                  <span className="text-3xl">{ad.image_url ? "📢" : "⭐"}</span>
-                  <Badge className="text-[10px] font-medium bg-primary/10 text-primary border-primary/20">
-                    Featured
-                  </Badge>
+                <h2 className="font-display text-lg sm:text-xl font-bold text-foreground mb-4">
+                  Your Portals
+                </h2>
+                <div className={`grid gap-3 ${portalGridClass}`}>
+                  {professionalPortals.map((portal) => (
+                    <motion.div
+                      key={portal.title}
+                      whileHover={{ y: -3 }}
+                      onClick={() => navigate(portal.route)}
+                      className="glass rounded-2xl p-4 flex items-center gap-4 cursor-pointer group hover:shadow-lg transition-all"
+                    >
+                      <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
+                        <portal.icon className={`w-5 h-5 ${portal.color}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm text-foreground">{portal.title}</p>
+                        <p className="text-xs text-muted-foreground truncate">{portal.desc}</p>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                    </motion.div>
+                  ))}
                 </div>
-                <h3 className="font-semibold text-sm text-foreground mb-1">{ad.title}</h3>
-                <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{ad.description || ad.category}</p>
-              </motion.div>
-            ))}
-            {featuredAds.length === 0 && featuredServices.map((service, i) => (
-              <motion.div
-                key={service.name}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.08 + 0.45 }}
-                whileHover={{ y: -4 }}
-                className="glass rounded-2xl p-5 cursor-pointer group hover:shadow-lg transition-all"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <span className="text-3xl">{service.image}</span>
-                  <Badge variant="secondary" className="text-[10px] font-medium">
-                    {service.tag}
-                  </Badge>
-                </div>
-                <h3 className="font-semibold text-sm text-foreground mb-1">{service.name}</h3>
-                <p className="text-xs text-muted-foreground mb-3">{service.provider}</p>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1">
-                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                    <span className="text-xs font-semibold text-foreground">{service.rating}</span>
-                    <span className="text-xs text-muted-foreground">({service.reviews})</span>
-                  </div>
-                  <span className="font-bold text-sm text-primary">{service.price}</span>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </motion.section>
+              </motion.section>
+            )}
 
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.45 }}
-          className="mb-10"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display text-lg sm:text-xl font-bold text-foreground">
-              <TrendingUp className="w-5 h-5 inline mr-2 text-primary" />
-              Popular near you
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {popularDiscoveryItems.map((item, index) => {
-              const Icon = item.entity_type === "transport"
-                ? Truck
-                : item.entity_type === "service"
-                  ? Wrench
-                  : item.entity_type === "shop"
-                    ? Store
-                    : ShoppingBag;
-
-              return (
-                <motion.div
-                  key={`${item.entity_type}-${item.entity_id}`}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.06 + 0.5 }}
-                  whileHover={{ y: -4 }}
-                  onClick={() => handleDiscoveryNavigation(item.link_url)}
-                  className="glass rounded-2xl p-5 cursor-pointer group hover:shadow-lg transition-all"
-                >
-                  <div className="mb-3 flex items-start justify-between gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <Badge variant="secondary" className="text-[10px] font-medium">
-                      {item.badge}
-                    </Badge>
-                  </div>
-
-                  <h3 className="mb-1 text-sm font-semibold text-foreground">{item.title}</h3>
-                  <p className="mb-3 line-clamp-2 text-xs text-muted-foreground">{item.subtitle}</p>
-
-                  <div className="flex items-center justify-between gap-3 text-xs">
-                    <span className="font-medium text-primary">{item.price_label || `${item.popularity} orders`}</span>
-                    <span className="text-muted-foreground">{item.popularity > 0 ? `${item.popularity} orders` : "Trending"}</span>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
-        </motion.section>
-
-        {/* Portal shortcuts for users who already have professional roles */}
-        {!authLoading && professionalPortals.length > 0 && (
-          <motion.section
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.5 }}
-            className="mb-10"
-          >
-            <h2 className="font-display text-lg sm:text-xl font-bold text-foreground mb-4">
-              Your Portals
-            </h2>
-            <div className={`grid gap-3 ${portalGridClass}`}>
-              {professionalPortals.map((portal) => (
-                <motion.div
-                  key={portal.title}
-                  whileHover={{ y: -3 }}
-                  onClick={() => navigate(portal.route)}
-                  className="glass rounded-2xl p-4 flex items-center gap-4 cursor-pointer group hover:shadow-lg transition-all"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
-                    <portal.icon className={`w-5 h-5 ${portal.color}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm text-foreground">{portal.title}</p>
-                    <p className="text-xs text-muted-foreground truncate">{portal.desc}</p>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                </motion.div>
-              ))}
+            {/* Footer */}
+            <div className="text-center pt-6 pb-4">
+              <p className="text-xs text-muted-foreground">
+                Powered by <span className="font-semibold text-foreground">CityLinks</span> — Your Hyperlocal Partner
+              </p>
             </div>
-          </motion.section>
-        )}
-
-        {/* Footer */}
-        <div className="text-center pt-6 pb-4">
-          <p className="text-xs text-muted-foreground">
-            Powered by <span className="font-semibold text-foreground">CityLinks</span> — Your Hyperlocal Partner
-          </p>
-        </div>
           </>
         )}
       </div>
@@ -1024,11 +1133,10 @@ const CustomerDashboard = () => {
                   {transportOptions.map((opt) => (
                     <label
                       key={opt.id}
-                      className={`flex items-center gap-4 p-4 rounded-xl border cursor-pointer transition-all ${
-                        selectedTransport === opt.id
+                      className={`flex items-center gap-4 p-4 rounded-xl border cursor-pointer transition-all ${selectedTransport === opt.id
                           ? "border-primary bg-primary/5 shadow-sm"
                           : "border-border/50 hover:border-border hover:bg-accent/30"
-                      }`}
+                        }`}
                     >
                       <RadioGroupItem value={opt.id} className="shrink-0" />
                       <div className="w-10 h-10 rounded-xl bg-portal-transportation/10 flex items-center justify-center shrink-0">

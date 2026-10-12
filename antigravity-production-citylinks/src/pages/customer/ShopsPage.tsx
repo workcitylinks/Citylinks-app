@@ -100,11 +100,20 @@ const ShopsPage = () => {
       <CustomerNavbar />
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center gap-4 mb-8">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
-            <ArrowLeft className="w-5 h-5" />
+        <div className="mb-6">
+          <Button variant="ghost" className="gap-2 mb-4 text-muted-foreground" onClick={() => navigate("/")}>
+            <ArrowLeft className="w-4 h-4" /> Back to Home
           </Button>
-          <h1 className="text-2xl sm:text-3xl font-bold font-display">Nearby Shops</h1>
+
+          <h1 className="text-2xl sm:text-3xl font-bold font-display flex items-center">
+            <span className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mr-3 text-primary">
+              <MapPin className="w-6 h-6" />
+            </span>
+            Near by Shops
+          </h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Find and explore stores around you
+          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

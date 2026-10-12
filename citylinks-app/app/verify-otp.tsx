@@ -5,28 +5,43 @@ import {
   TextInput, 
   TouchableOpacity, 
   ActivityIndicator, 
-  Alert, 
   KeyboardAvoidingView, 
-  Platform,
-  StyleSheet,
-  Pressable,
-  ScrollView
+  Platform, 
+  StyleSheet, 
+  Pressable, 
+  ScrollView,
+  Image 
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ArrowLeft, ShieldCheck } from "lucide-react-native";
+import { ArrowLeft } from "lucide-react-native";
 import { router, useLocalSearchParams } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiClient } from "../api/apiClient";
+import { useToast } from "../context/ToastContext";
+import { AppRefreshControl } from "../components/ui/RefreshableScrollView";
 
 const OTP_LENGTH = 5;
 
 const VerifyOTP = () => {
   const params = useLocalSearchParams();
-  const email = params.email as string;
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    setOtp("");
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 400);
+  }, []);
+  const email = (params.email as string) || "";
+  const mode = (params.mode as string) || "signup"; // 'signup' | 'reset-password'
+
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [timeLeft, setTimeLeft] = useState(120);
   const inputRef = useRef<TextInput>(null);
+  const { showSuccess, showError } = useToast();
 
   useEffect(() => {
     if (timeLeft <= 0) return;
@@ -54,13 +69,43 @@ const VerifyOTP = () => {
     
     setLoading(true);
     try {
-      const response = await apiClient.post('/auth/verify-otp', { email, otp });
-      if (response.data.token) {
-        Alert.alert("Success", "Account verified!");
-        router.replace("/");
+      if (mode === "reset-password") {
+        await apiClient.post('/auth/verify-reset-otp', { email, otp });
+        showSuccess("Code verified! Set your new password.", "Code Verified");
+        setTimeout(() => {
+          router.push({ pathname: "/reset-password", params: { email, otp } });
+        }, 600);
+      } else {
+        const response = await apiClient.post('/auth/verify-otp', { email, otp });
+        if (response.data.token) {
+          await AsyncStorage.setItem('user_token', response.data.token);
+          if (response.data.user) {
+            await AsyncStorage.setItem('user_data', JSON.stringify(response.data.user));
+          }
+          const userName = response.data.user?.fullName || "there";
+          
+          if (response.data.isProfileComplete) {
+            showSuccess(`Welcome to CityLinks, ${userName}!`, "Account Verified");
+            setTimeout(() => {
+              router.replace("/");
+            }, 800);
+          } else {
+            showSuccess("Account verified! Let's complete your profile.", "Almost Done");
+            setTimeout(() => {
+              router.replace({ 
+                pathname: "/complete-profile", 
+                params: { 
+                  email: response.data.user?.email || email,
+                  fullName: response.data.user?.fullName || ""
+                } 
+              });
+            }, 800);
+          }
+        }
       }
     } catch (error: any) {
-      Alert.alert("Error", error.response?.data?.error || "Invalid or expired OTP");
+      const errMsg = error.response?.data?.error || "Invalid or expired OTP";
+      showError(errMsg, "Verification Failed");
       setOtp(""); // Clear on error
       inputRef.current?.focus();
     } finally {
@@ -73,11 +118,15 @@ const VerifyOTP = () => {
     
     setLoading(true);
     try {
-      await apiClient.post('/auth/resend-otp', { email });
+      if (mode === "reset-password") {
+        await apiClient.post('/auth/forgot-password', { email });
+      } else {
+        await apiClient.post('/auth/resend-otp', { email });
+      }
       setTimeLeft(120); // Reset timer
-      Alert.alert("Success", "New OTP sent to your email!");
+      showSuccess("New OTP sent to your email!", "Code Resent");
     } catch (error: any) {
-      Alert.alert("Error", error.response?.data?.error || "Failed to resend OTP");
+      showError(error.response?.data?.error || "Failed to resend OTP", "Resend Failed");
     } finally {
       setLoading(false);
     }
@@ -88,36 +137,36 @@ const VerifyOTP = () => {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      {/* Header */}
-      <View className="flex-row items-center px-4 py-3">
-        <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2">
-          <ArrowLeft color="#1e293b" size={24} />
-        </TouchableOpacity>
-        <Text className="text-xl font-semibold text-slate-800 ml-2">OTP Verification</Text>
-      </View>
-
+    <SafeAreaView className="flex-1 bg-background">
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} className="flex-1">
-        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: "center", paddingHorizontal: 24 }} keyboardShouldPersistTaps="handled">
-          
-          {/* Illustration Area */}
-          <View className="items-center justify-center py-6 mt-2">
-            <View className="bg-blue-50 p-8 rounded-full items-center justify-center">
-              <ShieldCheck color="#3b82f6" size={80} strokeWidth={1.5} />
+        <ScrollView 
+          contentContainerStyle={{ flexGrow: 1, justifyContent: "center", paddingHorizontal: 24, paddingVertical: 24 }} 
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <AppRefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+            />
+          }
+        >
+          <View className="w-full max-w-md mx-auto">
+            {/* Logo at top center */}
+            <View className="items-center mb-6">
+              <Image 
+                source={require('../assets/images/logo.png')} 
+                style={{ width: 84, height: 84 }} 
+                resizeMode="contain" 
+                className="mb-4"
+              />
+              <Text className="text-2xl font-bold text-foreground mb-1 text-center">
+                {mode === "reset-password" ? "Verify Reset Code" : "OTP Verification"}
+              </Text>
+              <Text className="text-sm text-muted-foreground text-center">
+                We sent a 5-digit verification code to{"\n"}
+                <Text className="font-semibold text-primary">{email || "your email"}</Text>
+              </Text>
             </View>
-          </View>
-
-          {/* Text Section */}
-          <View className="mb-8">
-            <Text className="text-2xl font-semibold text-slate-800 mb-3">
-              <Text className="font-bold">OTP Code </Text>
-              Verification
-            </Text>
-            <Text className="text-slate-500 text-base leading-6">
-              We have sent an OTP code to your Email{"\n"}
-              <Text className="font-semibold text-slate-700">{email || "your email"}</Text>. Enter the OTP code below to verify.
-            </Text>
-          </View>
 
           {/* OTP Input Section */}
           <View className="items-center mb-8">
@@ -180,9 +229,17 @@ const VerifyOTP = () => {
             )}
           </View>
 
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+          <TouchableOpacity 
+            onPress={() => router.push("/auth")}
+            className="flex-row justify-center items-center gap-2 mt-2"
+          >
+            <ArrowLeft color="#64748b" size={16} />
+            <Text className="text-muted-foreground font-medium">Back to Sign In</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  </SafeAreaView>
   );
 };
 

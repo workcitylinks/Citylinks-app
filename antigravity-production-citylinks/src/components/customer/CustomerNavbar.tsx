@@ -44,7 +44,13 @@ const CustomerNavbar = ({ searchQuery = "", onSearchChange, showSearch = true, c
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-14 sm:h-16 gap-2">
         <div
           className="flex items-center gap-2 cursor-pointer shrink-0"
-          onClick={() => navigate("/")}
+          onClick={() => {
+            if (location.pathname === "/") {
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            } else {
+              navigate("/");
+            }
+          }}
         >
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
             <span className="text-primary-foreground font-bold text-sm">CL</span>

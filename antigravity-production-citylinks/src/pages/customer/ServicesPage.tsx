@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -16,6 +16,7 @@ import {
   MapPin,
   Filter,
   Clock,
+  MoreHorizontal,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,7 @@ const categoryConfig: Record<string, { icon: any; color: string; label: string }
   salon: { icon: Scissors, color: "bg-pink-500/10 text-pink-600", label: "Salon" },
   carpentry: { icon: Home, color: "bg-amber-500/10 text-amber-700", label: "Carpentry" },
   general: { icon: Wrench, color: "bg-muted text-muted-foreground", label: "General" },
+  others: { icon: MoreHorizontal, color: "bg-slate-500/10 text-slate-600", label: "Others" },
 };
 
 const allCategories = Object.keys(categoryConfig);
@@ -41,6 +43,13 @@ const ServicesPage = () => {
   const initialCategory = searchParams.get("category") || "";
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
+
+  useEffect(() => {
+    const cat = searchParams.get("category");
+    if (cat !== null) {
+      setSelectedCategory(cat);
+    }
+  }, [searchParams]);
 
   const { data: services, isLoading } = useQuery({
     queryKey: ["all-labor-services"],
@@ -54,8 +63,16 @@ const ServicesPage = () => {
   });
 
   const filtered = (services || []).filter((s) => {
-    const matchesCategory = !selectedCategory || s.category.toLowerCase() === selectedCategory.toLowerCase();
-    const matchesSearch = !searchQuery || s.service_name.toLowerCase().includes(searchQuery.toLowerCase()) || s.category.toLowerCase().includes(searchQuery.toLowerCase());
+    const sCat = (s.category || "").toLowerCase();
+    const selCat = (selectedCategory || "").toLowerCase();
+    const matchesCategory =
+      !selectedCategory ||
+      sCat === selCat ||
+      ((selCat === "others" || selCat === "other") && (sCat === "others" || sCat === "other"));
+    const matchesSearch =
+      !searchQuery ||
+      s.service_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      sCat.includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
 
