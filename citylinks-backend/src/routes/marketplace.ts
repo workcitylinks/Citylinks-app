@@ -1,5 +1,5 @@
 import express from 'express';
-import { cacheResponse } from '../middleware/cache';
+import { cacheResponse, invalidateCache } from '../middleware/cache';
 import { prisma } from '../lib/prisma';
 
 const router = express.Router();
@@ -448,11 +448,15 @@ router.get('/featured-services', async (req, res) => {
 // GET /api/marketplace/digital-providers - Fetch people who provide digital services with category filter and search
 router.get('/digital-providers', cacheResponse(120), async (req, res) => {
   try {
-    const { category, q } = req.query;
-    let whereCondition: any = { isAvailable: true };
+    const { category, q, providerName, all } = req.query;
+    let whereCondition: any = all === 'true' ? {} : { isAvailable: true };
 
     if (category && typeof category === 'string' && category.toLowerCase() !== 'all') {
       whereCondition.serviceType = { contains: category, mode: 'insensitive' };
+    }
+
+    if (providerName && typeof providerName === 'string' && providerName.trim().length > 0) {
+      whereCondition.name = { equals: providerName.trim(), mode: 'insensitive' };
     }
 
     if (q && typeof q === 'string' && q.trim().length > 0) {
@@ -468,11 +472,120 @@ router.get('/digital-providers', cacheResponse(120), async (req, res) => {
 
     const providers = await prisma.digitalServiceProvider.findMany({
       where: whereCondition,
-      orderBy: { rating: 'desc' },
+      orderBy: { createdAt: 'desc' },
     });
     res.json(providers);
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to fetch digital service providers' });
+  }
+});
+
+// POST /api/marketplace/digital-providers - Add a new digital service offering
+router.post('/digital-providers', async (req, res) => {
+  try {
+    const {
+      name,
+      serviceType,
+      priceLabel,
+      phone,
+      location,
+      description,
+      imageUrl,
+      badge = 'Verified',
+      isAvailable = true,
+    } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Specialist / Provider name is required' });
+    }
+    if (!serviceType || !serviceType.trim()) {
+      return res.status(400).json({ error: 'Digital service domain / category is required' });
+    }
+
+    const newProvider = await prisma.digitalServiceProvider.create({
+      data: {
+        name: name.trim(),
+        serviceType: serviceType.trim(),
+        priceLabel: priceLabel ? priceLabel.trim() : 'Contact for quote',
+        phone: phone ? phone.trim() : null,
+        location: location ? location.trim() : 'Haveri Region',
+        description: description ? description.trim() : null,
+        imageUrl: imageUrl && typeof imageUrl === 'string' && imageUrl.trim().length > 0 ? imageUrl.trim() : null,
+        badge: badge ? badge.trim() : 'Verified',
+        rating: 4.9,
+        isAvailable: Boolean(isAvailable),
+      },
+    });
+
+    // Ensure category exists in DigitalService table so it appears in category filter pills
+    try {
+      const existingCategory = await prisma.digitalService.findFirst({
+        where: { name: { equals: serviceType.trim(), mode: 'insensitive' } },
+      });
+      if (!existingCategory) {
+        await prisma.digitalService.create({
+          data: {
+            name: serviceType.trim(),
+            desc: `${serviceType.trim()} specialists & services`,
+            iconName: 'Laptop',
+            color: '#7c3aed',
+            badge: 'New',
+            isActive: true,
+          },
+        });
+      }
+    } catch (catErr) {
+      console.warn('Digital service category sync note:', catErr);
+    }
+
+    invalidateCache();
+
+    res.status(201).json({
+      success: true,
+      message: 'Service published to Digital Services directory!',
+      provider: newProvider,
+    });
+  } catch (err: any) {
+    console.error('Error creating digital service provider:', err);
+    res.status(500).json({ error: err.message || 'Failed to create digital service provider' });
+  }
+});
+
+// DELETE /api/marketplace/digital-providers/:id - Delete a digital service offering
+router.delete('/digital-providers/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.digitalServiceProvider.delete({
+      where: { id: String(id) },
+    });
+
+    invalidateCache();
+
+    res.json({ success: true, message: 'Digital service removed from directory' });
+  } catch (err: any) {
+    console.error('Error deleting digital service provider:', err);
+    res.status(500).json({ error: err.message || 'Failed to delete digital service provider' });
+  }
+});
+
+// PATCH /api/marketplace/digital-providers/:id/availability - Toggle digital service availability
+router.patch('/digital-providers/:id/availability', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = await prisma.digitalServiceProvider.findUnique({ where: { id: String(id) } });
+    if (!existing) return res.status(404).json({ error: 'Digital service provider not found' });
+
+    const nextVal = req.body.isAvailable !== undefined ? Boolean(req.body.isAvailable) : !existing.isAvailable;
+    const updated = await prisma.digitalServiceProvider.update({
+      where: { id: String(id) },
+      data: { isAvailable: nextVal },
+    });
+
+    invalidateCache();
+
+    res.json({ success: true, provider: updated });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to update availability' });
   }
 });
 

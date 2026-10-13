@@ -87,11 +87,26 @@ export const queryCache = {
    * Invalidate specific key or keys starting with prefix
    */
   invalidate(keyOrPrefix: string): void {
-    for (const key of memoryStore.keys()) {
+    // 1. Clear from in-memory cache
+    for (const key of Array.from(memoryStore.keys())) {
       if (key.startsWith(keyOrPrefix) || key === keyOrPrefix) {
         memoryStore.delete(key);
-        AsyncStorage.removeItem(`${CACHE_STORAGE_PREFIX}${key}`).catch(() => {});
       }
+    }
+
+    // 2. Also thoroughly remove from persistent storage
+    try {
+      AsyncStorage.getAllKeys().then((allKeys) => {
+        const prefix = `${CACHE_STORAGE_PREFIX}${keyOrPrefix}`;
+        const matching = allKeys.filter(
+          (k) => k === prefix || k.startsWith(prefix) || k.includes(keyOrPrefix)
+        );
+        if (matching.length > 0) {
+          AsyncStorage.multiRemove(matching).catch(() => {});
+        }
+      }).catch(() => {});
+    } catch {
+      // Ignore storage errors
     }
   },
 

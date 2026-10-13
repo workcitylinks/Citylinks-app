@@ -6,9 +6,10 @@ import {
   TouchableOpacity,
   TextInput,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import {
   ArrowLeft,
   TrendingUp,
@@ -30,9 +31,10 @@ export default function DealsScreen() {
   const { showSuccess, showError } = useToast();
   const { userToken } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
 
   // Hook handles caching and debounced search
-  const { deals, loading, refreshing, refetch } = useDeals('All', searchQuery);
+  const { deals, loading, refreshing, refetch } = useDeals(selectedCategory, searchQuery);
 
   useEffect(() => {
     if (!userToken) {
@@ -40,6 +42,13 @@ export default function DealsScreen() {
       router.replace('/auth' as any);
     }
   }, [userToken]);
+
+  // Revalidate on screen focus to reflect newly added or deleted deals
+  useFocusEffect(
+    React.useCallback(() => {
+      refetch();
+    }, [])
+  );
 
   const onRefresh = () => {
     refetch({ force: true });
@@ -102,6 +111,39 @@ export default function DealsScreen() {
               </TouchableOpacity>
             )}
           </View>
+
+          {/* Category Filter Chips */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 6, paddingTop: 8, paddingBottom: 2 }}
+          >
+            {['All', 'Shopping', 'Services', 'Food', 'Electronics', 'Salon', 'Transport'].map((cat) => (
+              <TouchableOpacity
+                key={cat}
+                activeOpacity={0.7}
+                onPress={() => setSelectedCategory(cat)}
+                style={{
+                  backgroundColor: selectedCategory === cat ? '#2563eb' : '#f1f5f9',
+                  borderColor: selectedCategory === cat ? '#2563eb' : '#e2e8f0',
+                  borderWidth: 1,
+                  paddingHorizontal: 12,
+                  paddingVertical: 5,
+                  borderRadius: 10,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: '700',
+                    color: selectedCategory === cat ? '#ffffff' : '#475569',
+                  }}
+                >
+                  {cat}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
       </SafeAreaView>
 
@@ -154,6 +196,26 @@ export default function DealsScreen() {
                   key={deal.id}
                   className="bg-white rounded-3xl p-5 mb-3.5 shadow-sm border border-slate-100"
                 >
+                  {/* Optional Deal Cover Photo */}
+                  {Boolean(deal.imageUrl) && (
+                    <View
+                      style={{
+                        width: '100%',
+                        height: 140,
+                        borderRadius: 16,
+                        overflow: 'hidden',
+                        marginBottom: 12,
+                        backgroundColor: '#f1f5f9',
+                      }}
+                    >
+                      <Image
+                        source={{ uri: deal.imageUrl! }}
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMode="cover"
+                      />
+                    </View>
+                  )}
+
                   <View className="flex-row items-center justify-between mb-2">
                     <View className="bg-amber-50 px-3 py-1 rounded-full flex-row items-center">
                       <Tag size={12} color="#d97706" />

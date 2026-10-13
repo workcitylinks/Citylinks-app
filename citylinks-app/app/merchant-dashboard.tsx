@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import {
   ChevronLeft,
   Store,
@@ -32,14 +32,22 @@ import {
   CheckCircle,
   Camera,
   Image as ImageIcon,
+  Tag,
+  Percent,
+  TrendingUp,
+  Bell,
+  Clock,
+  ArrowRight,
 } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { apiClient } from '../api/apiClient';
-import { ShopItem, ProductItem } from '../queries/marketplaceQueries';
+import { ShopItem, ProductItem, DealItem } from '../queries/marketplaceQueries';
 import { getShopCoverImage, getProductCoverImage } from './shop-detail';
+import { queryCache } from '../utils/queryCache';
+import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
 
 export default function MerchantDashboardScreen() {
   const { userData } = useApp();
@@ -72,6 +80,81 @@ export default function MerchantDashboardScreen() {
   const [prodImage, setProdImage] = useState<string | null>(null);
   const [pickingProdImage, setPickingProdImage] = useState(false);
   const [addingProduct, setAddingProduct] = useState(false);
+
+  // Deals & Offers State
+  const [merchantDeals, setMerchantDeals] = useState<DealItem[]>([]);
+  const [loadingDeals, setLoadingDeals] = useState(false);
+  const [addDealModalOpen, setAddDealModalOpen] = useState(false);
+  const [dealTitle, setDealTitle] = useState('');
+  const [dealDiscount, setDealDiscount] = useState('20% OFF');
+  const [dealCategory, setDealCategory] = useState('');
+  const [dealValidUntil, setDealValidUntil] = useState('Valid till Sunday');
+  const [dealImage, setDealImage] = useState<string | null>(null);
+  const [pickingDealImage, setPickingDealImage] = useState(false);
+  const [addingDeal, setAddingDeal] = useState(false);
+  const [deletingDealId, setDeletingDealId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<{
+    id: string;
+    title: string;
+    discount?: string;
+    merchantName?: string;
+    type?: 'deal' | 'product';
+  } | null>(null);
+
+  // Take photo with camera for deal
+  const handleTakeDealPhoto = async () => {
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        showError('Camera access is required to take a deal photo.', 'Permission Needed');
+        return;
+      }
+      setPickingDealImage(true);
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.7,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setDealImage(result.assets[0].uri);
+        showSuccess('Deal photo captured!', 'Success');
+      }
+    } catch (err: any) {
+      console.error('Camera error:', err);
+      showError('Failed to capture photo from camera.', 'Camera Error');
+    } finally {
+      setPickingDealImage(false);
+    }
+  };
+
+  // Pick photo from gallery for deal
+  const handlePickDealFromGallery = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        showError('Gallery access is required to choose a deal photo.', 'Permission Needed');
+        return;
+      }
+      setPickingDealImage(true);
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.7,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setDealImage(result.assets[0].uri);
+        showSuccess('Deal image selected from gallery!', 'Success');
+      }
+    } catch (err: any) {
+      console.error('Gallery error:', err);
+      showError('Failed to select image from gallery.', 'Gallery Error');
+    } finally {
+      setPickingDealImage(false);
+    }
+  };
 
   // Take photo with camera for product
   const handleTakeProductPhoto = async () => {
@@ -149,6 +232,7 @@ export default function MerchantDashboardScreen() {
         setEditAddress(s.address || s.location || '');
         setEditPhone(s.phone || '');
         setEditEmail(s.email || '');
+        fetchDeals(s.name);
       } else if (userData) {
         // Fallback default storefront based on user profile if initializing
         const defaultName = userData.fullName ? `${userData.fullName}'s Store` : 'My Store';
@@ -169,6 +253,7 @@ export default function MerchantDashboardScreen() {
         setEditAddress(userData.address || 'Haveri, Karnataka');
         setEditPhone(userData.phone || '');
         setEditEmail(userData.email || '');
+        fetchDeals(defaultName);
       }
     } catch (err: any) {
       console.warn('Notice: storefront initializing:', err);
@@ -180,6 +265,12 @@ export default function MerchantDashboardScreen() {
   useEffect(() => {
     fetchMyShop();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchMyShop();
+    }, [])
+  );
 
   // Auto GPS Location Fetcher
   const handleAutoFetchLocation = async () => {
@@ -303,16 +394,153 @@ export default function MerchantDashboardScreen() {
     }
   };
 
-  const handleDeleteProduct = async (productId: string, productName: string) => {
+  const handleDeleteProduct = (productId: string, productName: string) => {
+    setDeleteConfirmTarget({
+      id: productId,
+      title: productName,
+      type: 'product',
+    });
+  };
+
+  const fetchDeals = async (merchantName?: string) => {
     try {
-      const targetId = shop?.id && shop.id !== 'temp-shop' ? shop.id : 'my-shop';
-      await apiClient.delete(`/shops/${targetId}/products/${productId}`);
-      showSuccess(`Removed "${productName}"`, 'Product Removed');
-      await fetchMyShop();
-    } catch (err: any) {
-      console.error('Delete product error:', err);
-      showError('Failed to delete product', 'Error');
+      setLoadingDeals(true);
+      const targetName = merchantName || shop?.name;
+      const res = await apiClient.get('/deals', {
+        params: targetName ? { merchantName: targetName } : undefined,
+      });
+      if (Array.isArray(res.data)) {
+        if (targetName) {
+          setMerchantDeals(
+            res.data.filter(
+              (d: any) => d.merchantName?.toLowerCase() === targetName.toLowerCase()
+            )
+          );
+        } else {
+          setMerchantDeals(res.data);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch merchant deals:', err);
+    } finally {
+      setLoadingDeals(false);
     }
+  };
+
+  const handleAddDeal = async () => {
+    if (!dealTitle.trim()) {
+      showError('Deal title / headline is required', 'Missing Title');
+      return;
+    }
+    if (!dealDiscount.trim()) {
+      showError('Discount offer badge is required (e.g. 20% OFF)', 'Missing Discount');
+      return;
+    }
+
+    const shopName = shop?.name || `${userData?.fullName || 'My'} Store`;
+    const cat = dealCategory.trim() || shop?.category || 'Shopping';
+    const linkUrl = shop?.id && shop.id !== 'temp-shop' ? `/shop-detail?id=${shop.id}` : '/deals';
+
+    try {
+      setAddingDeal(true);
+      await apiClient.post('/deals', {
+        title: dealTitle.trim(),
+        discount: dealDiscount.trim(),
+        category: cat,
+        merchantName: shopName,
+        validUntil: dealValidUntil.trim() || 'Limited time offer',
+        linkUrl,
+        imageUrl: dealImage || undefined,
+        broadcastNotification: true,
+      });
+
+      showSuccess(
+        `Published "${dealTitle.trim()}"! Broadcast notification sent to all users.`,
+        'Deal Live & Notified'
+      );
+
+      // Invalidate caches
+      queryCache.invalidate('/deals');
+      queryCache.invalidate('/notifications');
+
+      // Reset modal
+      setDealTitle('');
+      setDealDiscount('20% OFF');
+      setDealValidUntil('Valid till Sunday');
+      setDealImage(null);
+      setAddDealModalOpen(false);
+
+      await fetchDeals(shopName);
+    } catch (err: any) {
+      console.error('Add deal error:', err);
+      showError(err.response?.data?.error || 'Failed to publish deal & offer', 'Error');
+    } finally {
+      setAddingDeal(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    queryCache.invalidate('/shops/my-shop');
+    queryCache.invalidate('/deals');
+    queryCache.invalidate('/notifications');
+    try {
+      await Promise.allSettled([
+        fetchMyShop(),
+        fetchDeals(shop?.name),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const confirmDeleteTarget = async () => {
+    if (!deleteConfirmTarget) return;
+    const { id, title, type = 'deal' } = deleteConfirmTarget;
+
+    if (type === 'deal') {
+      // 1. Instant optimistic removal from UI and all listings
+      setMerchantDeals((prev) => prev.filter((d) => d.id !== id));
+      setDeletingDealId(id);
+      try {
+        await apiClient.delete(`/deals/${id}`);
+        showSuccess(`Removed "${title}" from all listings & user notifications`, 'Deal Deleted');
+        queryCache.invalidate('/deals');
+        queryCache.invalidate('/notifications');
+      } catch (err: any) {
+        console.error('Delete deal error:', err);
+        showError('Failed to remove deal from server', 'Error');
+        await fetchDeals(shop?.name);
+      } finally {
+        setDeletingDealId(null);
+        setDeleteConfirmTarget(null);
+      }
+    } else {
+      // Product delete
+      setProducts((prev) => prev.filter((p) => p.id !== id));
+      try {
+        const targetId = shop?.id && shop.id !== 'temp-shop' ? shop.id : 'my-shop';
+        await apiClient.delete(`/shops/${targetId}/products/${id}`);
+        showSuccess(`Removed "${title}" from catalog`, 'Product Removed');
+        queryCache.invalidate('/shops/my-shop');
+      } catch (err: any) {
+        console.error('Delete product error:', err);
+        showError('Failed to delete product', 'Error');
+        await fetchMyShop();
+      } finally {
+        setDeleteConfirmTarget(null);
+      }
+    }
+  };
+
+  const handleDeleteDeal = (dealId: string, dealName: string, dealDiscountStr?: string) => {
+    setDeleteConfirmTarget({
+      id: dealId,
+      title: dealName,
+      discount: dealDiscountStr,
+      merchantName: shop?.name,
+      type: 'deal',
+    });
   };
 
   return (
@@ -368,6 +596,9 @@ export default function MerchantDashboardScreen() {
         <ScrollView
           contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
         >
           {/* STOREFRONT PREVIEW CARD (Matching Near By Shops Display) */}
           <View
@@ -547,15 +778,19 @@ export default function MerchantDashboardScreen() {
           <View
             style={{
               backgroundColor: '#ffffff',
-              borderRadius: 24,
+              borderRadius: 22,
               padding: 18,
               borderWidth: 1,
               borderColor: '#e2e8f0',
-              marginBottom: 20,
-              overflow: 'hidden',
+              marginBottom: 18,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.04,
+              shadowRadius: 8,
+              elevation: 2,
             }}
           >
-            {/* Header Row: Catalog title & Add Item Button */}
+            {/* Header Row: Title on Left, Add Button on Right */}
             <View
               style={{
                 flexDirection: 'row',
@@ -565,19 +800,46 @@ export default function MerchantDashboardScreen() {
                 gap: 10,
               }}
             >
-              <View style={{ flex: 1, flexShrink: 1, marginRight: 6 }}>
-                <Text
-                  style={{ fontSize: 16, fontWeight: '800', color: '#0f172a' }}
-                  numberOfLines={1}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                <View
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 12,
+                    backgroundColor: '#fff7ed',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
                 >
-                  Catalog Products ({products.length})
-                </Text>
-                <Text
-                  style={{ fontSize: 11, fontWeight: '500', color: '#64748b', marginTop: 2 }}
-                  numberOfLines={1}
-                >
-                  Items displayed in your store
-                </Text>
+                  <Package size={19} color="#ea580c" />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text
+                    style={{ fontSize: 16, fontWeight: '800', color: '#0f172a' }}
+                    numberOfLines={1}
+                  >
+                    Catalog Products
+                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                    <View
+                      style={{
+                        backgroundColor: '#ffedd5',
+                        paddingHorizontal: 6,
+                        paddingVertical: 1.5,
+                        borderRadius: 6,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Text style={{ fontSize: 10, fontWeight: '800', color: '#ea580c' }}>
+                        {products.length} ITEMS
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 11, color: '#64748b', fontWeight: '500' }} numberOfLines={1}>
+                      • Items displayed in your store
+                    </Text>
+                  </View>
+                </View>
               </View>
 
               <TouchableOpacity
@@ -585,22 +847,21 @@ export default function MerchantDashboardScreen() {
                 onPress={() => setAddProductModalOpen(true)}
                 style={{
                   backgroundColor: '#ea580c',
-                  paddingHorizontal: 14,
+                  paddingHorizontal: 13,
                   paddingVertical: 8,
                   borderRadius: 12,
                   flexDirection: 'row',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
+                  gap: 4,
                   shadowColor: '#ea580c',
                   shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.15,
+                  shadowOpacity: 0.2,
                   shadowRadius: 4,
                   elevation: 2,
                 }}
               >
-                <Plus size={15} color="#ffffff" strokeWidth={3} />
-                <Text style={{ fontSize: 12, fontWeight: '800', color: '#ffffff', marginLeft: 4 }}>
+                <Plus size={14} color="#ffffff" strokeWidth={3} />
+                <Text style={{ fontSize: 12, fontWeight: '800', color: '#ffffff' }}>
                   Add Item
                 </Text>
               </TouchableOpacity>
@@ -609,29 +870,29 @@ export default function MerchantDashboardScreen() {
             {products.length === 0 ? (
               <View
                 style={{
-                  padding: 24,
+                  paddingVertical: 24,
+                  paddingHorizontal: 16,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: '#f8fafc',
+                  backgroundColor: '#fff7ed',
                   borderRadius: 18,
-                  borderWidth: 1,
-                  borderColor: '#f1f5f9',
+                  borderWidth: 1.5,
+                  borderColor: '#fed7aa',
+                  borderStyle: 'dashed',
                 }}
               >
                 <View
                   style={{
-                    width: 52,
-                    height: 52,
-                    borderRadius: 26,
-                    backgroundColor: '#fff7ed',
+                    width: 50,
+                    height: 50,
+                    borderRadius: 25,
+                    backgroundColor: '#ffedd5',
                     alignItems: 'center',
                     justifyContent: 'center',
                     marginBottom: 10,
-                    borderWidth: 1,
-                    borderColor: '#fed7aa',
                   }}
                 >
-                  <Package size={26} color="#ea580c" />
+                  <Package size={24} color="#ea580c" />
                 </View>
                 <Text style={{ fontSize: 15, fontWeight: '800', color: '#0f172a' }}>
                   No Products Listed Yet
@@ -639,10 +900,10 @@ export default function MerchantDashboardScreen() {
                 <Text
                   style={{
                     fontSize: 12,
-                    color: '#64748b',
+                    color: '#9a3412',
                     textAlign: 'center',
                     marginTop: 4,
-                    marginBottom: 14,
+                    marginBottom: 16,
                     lineHeight: 18,
                     paddingHorizontal: 10,
                   }}
@@ -650,24 +911,25 @@ export default function MerchantDashboardScreen() {
                   Add your first retail item with price and stock so nearby Haveri customers can order from you.
                 </Text>
                 <TouchableOpacity
-                  activeOpacity={0.8}
+                  activeOpacity={0.85}
                   onPress={() => setAddProductModalOpen(true)}
                   style={{
                     backgroundColor: '#ea580c',
-                    paddingHorizontal: 18,
+                    paddingHorizontal: 20,
                     paddingVertical: 10,
                     borderRadius: 12,
                     flexDirection: 'row',
                     alignItems: 'center',
                     shadowColor: '#ea580c',
                     shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.2,
+                    shadowOpacity: 0.25,
                     shadowRadius: 4,
-                    elevation: 3,
+                    elevation: 2,
+                    gap: 6,
                   }}
                 >
                   <Plus size={16} color="#ffffff" strokeWidth={3} />
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#ffffff', marginLeft: 6 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#ffffff' }}>
                     Add Your First Item
                   </Text>
                 </TouchableOpacity>
@@ -687,7 +949,7 @@ export default function MerchantDashboardScreen() {
                         borderRadius: 14,
                         backgroundColor: '#f8fafc',
                         borderWidth: 1,
-                        borderColor: '#f1f5f9',
+                        borderColor: '#e2e8f0',
                       }}
                     >
                       <Image
@@ -705,7 +967,7 @@ export default function MerchantDashboardScreen() {
                         <Text style={{ fontSize: 14, fontWeight: '800', color: '#0f172a' }}>
                           {item.name}
                         </Text>
-                        <Text style={{ fontSize: 11, color: '#64748b' }}>
+                        <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
                           Stock: {item.stock} {item.unit}s
                         </Text>
                       </View>
@@ -713,24 +975,362 @@ export default function MerchantDashboardScreen() {
                         <Text style={{ fontSize: 15, fontWeight: '900', color: '#ea580c' }}>
                           ₹{item.price}
                         </Text>
-                      <TouchableOpacity
-                        activeOpacity={0.7}
-                        onPress={() => handleDeleteProduct(item.id, item.name)}
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          onPress={() => handleDeleteProduct(item.id, item.name)}
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 8,
+                            backgroundColor: '#fee2e2',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <Trash2 size={14} color="#ef4444" />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+
+          {/* DEALS & OFFERS MANAGEMENT SECTION */}
+          <View
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: 22,
+              padding: 18,
+              borderWidth: 1,
+              borderColor: '#e2e8f0',
+              marginBottom: 24,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.04,
+              shadowRadius: 8,
+              elevation: 2,
+            }}
+          >
+            {/* Header Row: Title on Left, Add Button on Right */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 14,
+                gap: 10,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                <View
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 12,
+                    backgroundColor: '#fef3c7',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Tag size={19} color="#d97706" />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text
+                    style={{ fontSize: 16, fontWeight: '800', color: '#0f172a' }}
+                    numberOfLines={1}
+                  >
+                    Deals & Offers
+                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                    <View
+                      style={{
+                        backgroundColor: '#fef3c7',
+                        paddingHorizontal: 6,
+                        paddingVertical: 1.5,
+                        borderRadius: 6,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Text style={{ fontSize: 10, fontWeight: '800', color: '#b45309' }}>
+                        {merchantDeals.length} ACTIVE
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 11, color: '#64748b', fontWeight: '500' }} numberOfLines={1}>
+                      • Broadcasted in Haveri
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setAddDealModalOpen(true)}
+                style={{
+                  backgroundColor: '#d97706',
+                  paddingHorizontal: 13,
+                  paddingVertical: 8,
+                  borderRadius: 12,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                  shadowColor: '#d97706',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 4,
+                  elevation: 2,
+                }}
+              >
+                <Plus size={14} color="#ffffff" strokeWidth={3} />
+                <Text style={{ fontSize: 12, fontWeight: '800', color: '#ffffff' }}>
+                  Add Deal
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {loadingDeals ? (
+              <View style={{ padding: 24, alignItems: 'center' }}>
+                <ActivityIndicator size="small" color="#d97706" />
+                <Text style={{ fontSize: 11, color: '#64748b', marginTop: 8 }}>
+                  Loading deals & offers...
+                </Text>
+              </View>
+            ) : merchantDeals.length === 0 ? (
+              <View
+                style={{
+                  paddingVertical: 24,
+                  paddingHorizontal: 16,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: '#fffbeb',
+                  borderRadius: 18,
+                  borderWidth: 1.5,
+                  borderColor: '#fde68a',
+                  borderStyle: 'dashed',
+                }}
+              >
+                <View
+                  style={{
+                    width: 50,
+                    height: 50,
+                    borderRadius: 25,
+                    backgroundColor: '#fef3c7',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 10,
+                  }}
+                >
+                  <Sparkles size={24} color="#d97706" />
+                </View>
+                <Text style={{ fontSize: 15, fontWeight: '800', color: '#0f172a', textAlign: 'center' }}>
+                  No Active Deals or Offers Yet
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: '#92400e',
+                    textAlign: 'center',
+                    marginTop: 4,
+                    marginBottom: 16,
+                    lineHeight: 18,
+                    paddingHorizontal: 10,
+                  }}
+                >
+                  Publish discount deals (e.g. 20% OFF, Buy 1 Get 1) to attract shoppers and broadcast instant push notifications across Haveri.
+                </Text>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => setAddDealModalOpen(true)}
+                  style={{
+                    backgroundColor: '#d97706',
+                    paddingHorizontal: 20,
+                    paddingVertical: 10,
+                    borderRadius: 12,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    shadowColor: '#d97706',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.25,
+                    shadowRadius: 4,
+                    elevation: 2,
+                    gap: 6,
+                  }}
+                >
+                  <Plus size={16} color="#ffffff" strokeWidth={3} />
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#ffffff' }}>
+                    Publish First Deal
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View>
+                {/* Clean 1-Line Info Strip */}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: '#fffbeb',
+                    borderRadius: 12,
+                    paddingHorizontal: 10,
+                    paddingVertical: 7,
+                    marginBottom: 12,
+                    borderWidth: 1,
+                    borderColor: '#fde68a',
+                    gap: 6,
+                  }}
+                >
+                  <Bell size={13} color="#d97706" />
+                  <Text style={{ flex: 1, fontSize: 11, color: '#92400e', fontWeight: '600' }} numberOfLines={1}>
+                    Active deals appear in Deals & Offers and alert Haveri shoppers
+                  </Text>
+                </View>
+
+                {/* Deal Items */}
+                <View style={{ gap: 10 }}>
+                  {merchantDeals.map((deal) => (
+                    <View
+                      key={deal.id}
+                      style={{
+                        borderRadius: 16,
+                        backgroundColor: '#f8fafc',
+                        borderWidth: 1,
+                        borderColor: '#e2e8f0',
+                        padding: 14,
+                      }}
+                    >
+                      {/* Optional Deal Image */}
+                      {Boolean(deal.imageUrl) && (
+                        <View
+                          style={{
+                            width: '100%',
+                            height: 120,
+                            borderRadius: 12,
+                            overflow: 'hidden',
+                            marginBottom: 10,
+                            backgroundColor: '#e2e8f0',
+                          }}
+                        >
+                          <Image
+                            source={{ uri: deal.imageUrl! }}
+                            style={{ width: '100%', height: '100%' }}
+                            resizeMode="cover"
+                          />
+                        </View>
+                      )}
+
+                      <View
                         style={{
-                          width: 30,
-                          height: 30,
-                          borderRadius: 8,
-                          backgroundColor: '#fee2e2',
+                          flexDirection: 'row',
                           alignItems: 'center',
-                          justifyContent: 'center',
+                          justifyContent: 'space-between',
+                          marginBottom: 6,
                         }}
                       >
-                        <Trash2 size={14} color="#ef4444" />
-                      </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <View
+                            style={{
+                              backgroundColor: '#fef3c7',
+                              borderColor: '#fde68a',
+                              borderWidth: 1,
+                              paddingHorizontal: 8,
+                              paddingVertical: 3,
+                              borderRadius: 8,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 4,
+                            }}
+                          >
+                            <Tag size={11} color="#d97706" />
+                            <Text style={{ fontSize: 11, fontWeight: '800', color: '#d97706' }}>
+                              {deal.discount}
+                            </Text>
+                          </View>
+                          <View
+                            style={{
+                              backgroundColor: '#e2e8f0',
+                              paddingHorizontal: 7,
+                              paddingVertical: 2,
+                              borderRadius: 6,
+                            }}
+                          >
+                            <Text style={{ fontSize: 10, fontWeight: '700', color: '#475569' }}>
+                              {deal.category}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          disabled={deletingDealId === deal.id}
+                          onPress={() => handleDeleteDeal(deal.id, deal.title, deal.discount)}
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 8,
+                            backgroundColor: '#fee2e2',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          {deletingDealId === deal.id ? (
+                            <ActivityIndicator size="small" color="#ef4444" />
+                          ) : (
+                            <Trash2 size={14} color="#ef4444" />
+                          )}
+                        </TouchableOpacity>
+                      </View>
+
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          fontWeight: '800',
+                          color: '#0f172a',
+                          marginBottom: 4,
+                          lineHeight: 19,
+                        }}
+                      >
+                        {deal.title}
+                      </Text>
+
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          paddingTop: 6,
+                          borderTopWidth: 1,
+                          borderTopColor: '#f1f5f9',
+                          marginTop: 4,
+                        }}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <Clock size={11} color="#64748b" />
+                          <Text style={{ fontSize: 11, color: '#64748b', fontWeight: '500' }}>
+                            {deal.validUntil || 'Active Offer'}
+                          </Text>
+                        </View>
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 4,
+                            backgroundColor: '#ecfdf5',
+                            paddingHorizontal: 6,
+                            paddingVertical: 2,
+                            borderRadius: 6,
+                          }}
+                        >
+                          <Bell size={10} color="#059669" />
+                          <Text style={{ fontSize: 9, fontWeight: '700', color: '#059669' }}>
+                            Broadcast Active
+                          </Text>
+                        </View>
+                      </View>
                     </View>
-                  </View>
-                );
-              })}
+                  ))}
+                </View>
               </View>
             )}
           </View>
@@ -1203,6 +1803,469 @@ export default function MerchantDashboardScreen() {
                 </Text>
               )}
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL: ADD DEAL & OFFER */}
+      <Modal visible={addDealModalOpen} transparent animationType="slide">
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.65)', justifyContent: 'flex-end' }}>
+            <View
+              style={{
+                backgroundColor: '#ffffff',
+                borderTopLeftRadius: 30,
+                borderTopRightRadius: 30,
+                padding: 20,
+                maxHeight: '90%',
+              }}
+            >
+              {/* Header */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={{ fontSize: 18, fontWeight: '900', color: '#0f172a' }}>
+                      Publish Deal & Offer
+                    </Text>
+                    <View style={{ backgroundColor: '#fef3c7', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 }}>
+                      <Text style={{ fontSize: 10, fontWeight: '800', color: '#d97706' }}>BROADCAST</Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 11, fontWeight: '500', color: '#64748b', marginTop: 2 }}>
+                    Broadcasts a real-time notification to all app users
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setAddDealModalOpen(false)}
+                  style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <X size={18} color="#64748b" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+                {/* 1. Deal Title */}
+                <View style={{ marginBottom: 14 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#0f172a', marginBottom: 6 }}>
+                    Offer Headline / Title *
+                  </Text>
+                  <TextInput
+                    value={dealTitle}
+                    onChangeText={setDealTitle}
+                    placeholder="e.g. Flat 25% Off on All Grocery & Essentials"
+                    placeholderTextColor="#94a3b8"
+                    style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600', color: '#0f172a' }}
+                  />
+                </View>
+
+                {/* 2. Discount Badge & Chips */}
+                <View style={{ marginBottom: 14 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#0f172a', marginBottom: 6 }}>
+                    Discount Badge / Offer *
+                  </Text>
+                  <TextInput
+                    value={dealDiscount}
+                    onChangeText={setDealDiscount}
+                    placeholder="e.g. 25% OFF, BUY 1 GET 1, FLAT ₹50 OFF"
+                    placeholderTextColor="#94a3b8"
+                    style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '700', color: '#d97706', marginBottom: 8 }}
+                  />
+                  {/* Preset Discount Chips */}
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                    {['10% OFF', '20% OFF', '25% OFF', '30% OFF', '50% OFF', 'BUY 1 GET 1', 'FLAT ₹50 OFF', 'FREE DELIVERY'].map((preset) => (
+                      <TouchableOpacity
+                        key={preset}
+                        activeOpacity={0.7}
+                        onPress={() => setDealDiscount(preset)}
+                        style={{
+                          backgroundColor: dealDiscount === preset ? '#d97706' : '#fffbeb',
+                          borderColor: dealDiscount === preset ? '#d97706' : '#fde68a',
+                          borderWidth: 1,
+                          paddingHorizontal: 10,
+                          paddingVertical: 5,
+                          borderRadius: 8,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            fontWeight: '700',
+                            color: dealDiscount === preset ? '#ffffff' : '#92400e',
+                          }}
+                        >
+                          {preset}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+
+                {/* 3. Validity / Expiry & Chips */}
+                <View style={{ marginBottom: 14 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#0f172a', marginBottom: 6 }}>
+                    Validity Period
+                  </Text>
+                  <TextInput
+                    value={dealValidUntil}
+                    onChangeText={setDealValidUntil}
+                    placeholder="e.g. Valid till Sunday / Limited time offer"
+                    placeholderTextColor="#94a3b8"
+                    style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600', color: '#0f172a', marginBottom: 8 }}
+                  />
+                  {/* Preset Validity Chips */}
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                    {['Today Only', 'This Weekend', 'Valid till Sunday', 'Valid till month end', 'Limited time offer'].map((preset) => (
+                      <TouchableOpacity
+                        key={preset}
+                        activeOpacity={0.7}
+                        onPress={() => setDealValidUntil(preset)}
+                        style={{
+                          backgroundColor: dealValidUntil === preset ? '#0284c7' : '#f0f9ff',
+                          borderColor: dealValidUntil === preset ? '#0284c7' : '#bae6fd',
+                          borderWidth: 1,
+                          paddingHorizontal: 10,
+                          paddingVertical: 5,
+                          borderRadius: 8,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            fontWeight: '700',
+                            color: dealValidUntil === preset ? '#ffffff' : '#0369a1',
+                          }}
+                        >
+                          {preset}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+
+                {/* 4. Category selector */}
+                <View style={{ marginBottom: 14 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#0f172a', marginBottom: 6 }}>
+                    Category
+                  </Text>
+                  <TextInput
+                    value={dealCategory || shop?.category || 'Shopping'}
+                    onChangeText={setDealCategory}
+                    placeholder="e.g. Shopping, Grocery, Electronics, Services"
+                    placeholderTextColor="#94a3b8"
+                    style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600', color: '#0f172a', marginBottom: 8 }}
+                  />
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                    {['Shopping', 'Grocery', 'Electronics', 'Services', 'Food', 'Salon', 'Transport'].map((cat) => (
+                      <TouchableOpacity
+                        key={cat}
+                        activeOpacity={0.7}
+                        onPress={() => setDealCategory(cat)}
+                        style={{
+                          backgroundColor: (dealCategory || shop?.category) === cat ? '#7c3aed' : '#faf5ff',
+                          borderColor: (dealCategory || shop?.category) === cat ? '#7c3aed' : '#e9d5ff',
+                          borderWidth: 1,
+                          paddingHorizontal: 10,
+                          paddingVertical: 5,
+                          borderRadius: 8,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            fontWeight: '700',
+                            color: (dealCategory || shop?.category) === cat ? '#ffffff' : '#6b21a8',
+                          }}
+                        >
+                          {cat}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+
+                {/* 5. Deal Photo Selector */}
+                <View style={{ marginBottom: 14 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6 }}>
+                    Offer Promotional Photo (Optional)
+                  </Text>
+                  {dealImage ? (
+                    <View
+                      style={{
+                        borderRadius: 14,
+                        overflow: 'hidden',
+                        borderWidth: 1.5,
+                        borderColor: '#d97706',
+                        backgroundColor: '#fffbeb',
+                        position: 'relative',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        height: 140,
+                        marginBottom: 8,
+                      }}
+                    >
+                      <Image
+                        source={{ uri: dealImage }}
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMode="cover"
+                      />
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => setDealImage(null)}
+                        style={{
+                          position: 'absolute',
+                          top: 8,
+                          right: 8,
+                          backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                          padding: 6,
+                          borderRadius: 20,
+                        }}
+                      >
+                        <X size={14} color="#ffffff" />
+                      </TouchableOpacity>
+                      <View
+                        style={{
+                          position: 'absolute',
+                          bottom: 8,
+                          left: 8,
+                          backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                          paddingHorizontal: 8,
+                          paddingVertical: 3,
+                          borderRadius: 12,
+                        }}
+                      >
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#ffffff' }}>
+                          Offer Photo Selected ✓
+                        </Text>
+                      </View>
+                    </View>
+                  ) : null}
+
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      disabled={pickingDealImage}
+                      onPress={handleTakeDealPhoto}
+                      style={{
+                        flex: 1,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        paddingVertical: 11,
+                        borderRadius: 12,
+                        backgroundColor: '#fffbeb',
+                        borderWidth: 1.5,
+                        borderColor: '#fde68a',
+                        gap: 6,
+                      }}
+                    >
+                      <Camera size={16} color="#d97706" />
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#d97706' }}>
+                        Camera
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      disabled={pickingDealImage}
+                      onPress={handlePickDealFromGallery}
+                      style={{
+                        flex: 1,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        paddingVertical: 11,
+                        borderRadius: 12,
+                        backgroundColor: '#eff6ff',
+                        borderWidth: 1.5,
+                        borderColor: '#bfdbfe',
+                        gap: 6,
+                      }}
+                    >
+                      <ImageIcon size={16} color="#2563eb" />
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#2563eb' }}>
+                        Gallery
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* 6. Live Push Notification Preview */}
+                <View
+                  style={{
+                    backgroundColor: '#fffbeb',
+                    borderRadius: 16,
+                    padding: 12,
+                    borderWidth: 1,
+                    borderColor: '#fde68a',
+                    marginBottom: 18,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <Bell size={14} color="#d97706" />
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#92400e', textTransform: 'uppercase' }}>
+                      Citizen Notification Preview
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#78350f' }}>
+                    🎉 {dealDiscount.trim() || '20% OFF'} at {shop?.name || 'Your Store'}!
+                  </Text>
+                  <Text style={{ fontSize: 11, color: '#92400e', marginTop: 2 }}>
+                    {dealTitle.trim() || 'Special store discount offer'}! Valid: {dealValidUntil || 'Limited time'}. Check out Deals & Offers in CityLinks!
+                  </Text>
+                </View>
+
+                {/* Submit Button */}
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  disabled={addingDeal}
+                  onPress={handleAddDeal}
+                  style={{
+                    backgroundColor: '#d97706',
+                    paddingVertical: 14,
+                    borderRadius: 14,
+                    alignItems: 'center',
+                    shadowColor: '#d97706',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.25,
+                    shadowRadius: 6,
+                    elevation: 3,
+                  }}
+                >
+                  {addingDeal ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#ffffff' }}>
+                      Publish Deal & Broadcast Alert
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* CONFIRMATION CARD MODAL */}
+      <Modal visible={deleteConfirmTarget !== null} transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.65)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <View
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: 28,
+              padding: 24,
+              width: '100%',
+              maxWidth: 380,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.18,
+              shadowRadius: 20,
+              elevation: 12,
+            }}
+          >
+            {/* Trash Icon Badge */}
+            <View
+              style={{
+                width: 58,
+                height: 58,
+                borderRadius: 29,
+                backgroundColor: '#fee2e2',
+                alignItems: 'center',
+                justifyContent: 'center',
+                alignSelf: 'center',
+                marginBottom: 16,
+                borderWidth: 2,
+                borderColor: '#fecaca',
+              }}
+            >
+              <Trash2 size={28} color="#dc2626" />
+            </View>
+
+            {/* Title */}
+            <Text style={{ fontSize: 18, fontWeight: '900', color: '#0f172a', textAlign: 'center', marginBottom: 6 }}>
+              {deleteConfirmTarget?.type === 'product' ? 'Delete Product?' : 'Delete Deal & Offer?'}
+            </Text>
+
+            {/* Subtitle */}
+            <Text style={{ fontSize: 13, color: '#64748b', textAlign: 'center', lineHeight: 18, marginBottom: 16 }}>
+              {deleteConfirmTarget?.type === 'product'
+                ? `Are you sure you want to delete "${deleteConfirmTarget?.title}"? It will be removed from your catalog.`
+                : `Are you sure you want to delete this offer? It will be removed from all listings in the Deals & Offers section and citizen notifications.`}
+            </Text>
+
+            {/* Deal Preview Info Box */}
+            {deleteConfirmTarget?.type !== 'product' && (
+              <View
+                style={{
+                  backgroundColor: '#fffbeb',
+                  borderRadius: 16,
+                  padding: 12,
+                  borderWidth: 1,
+                  borderColor: '#fde68a',
+                  marginBottom: 20,
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <Tag size={13} color="#d97706" />
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: '#d97706' }}>
+                    {deleteConfirmTarget?.discount || 'SPECIAL OFFER'}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: '#78350f' }} numberOfLines={2}>
+                  {deleteConfirmTarget?.title}
+                </Text>
+              </View>
+            )}
+
+            {/* Action Buttons */}
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                disabled={deletingDealId !== null}
+                onPress={() => setDeleteConfirmTarget(null)}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#f1f5f9',
+                  borderRadius: 14,
+                  paddingVertical: 13,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#475569' }}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.85}
+                disabled={deletingDealId !== null}
+                onPress={confirmDeleteTarget}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#dc2626',
+                  borderRadius: 14,
+                  paddingVertical: 13,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  shadowColor: '#dc2626',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.25,
+                  shadowRadius: 4,
+                  elevation: 2,
+                }}
+              >
+                {deletingDealId !== null ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#ffffff' }}>
+                    Yes, Delete
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>

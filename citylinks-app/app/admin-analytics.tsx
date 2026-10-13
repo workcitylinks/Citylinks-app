@@ -29,6 +29,7 @@ import {
 } from 'lucide-react-native';
 import { apiClient } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
+import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
 
 interface RoleStat {
   role: string;
@@ -93,8 +94,11 @@ export default function AdminAnalyticsScreen() {
     switch (role) {
       case 'MERCHANT':
         return Store;
+      case 'MANUAL_SERVICE_PROVIDER':
       case 'LABOR':
         return Wrench;
+      case 'DIGITAL_SERVICE_PROVIDER':
+        return Sparkles;
       case 'TRANSPORT':
         return Truck;
       case 'DEVELOPER':
@@ -145,6 +149,9 @@ export default function AdminAnalyticsScreen() {
         <ScrollView
           contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <AppRefreshControl refreshing={refreshing} onRefresh={fetchAnalytics} />
+          }
         >
           {/* Top Live Telemetry Header */}
           <View className="bg-slate-900 rounded-3xl p-5 mb-5 shadow-sm">

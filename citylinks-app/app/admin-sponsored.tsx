@@ -29,6 +29,7 @@ import { apiClient } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
 import { queryCache } from '../utils/queryCache';
 import { getShopCoverImage } from './shop-detail';
+import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
 
 export interface ShopRecord {
   id: string;
@@ -447,6 +448,9 @@ export default function AdminSponsoredScreen() {
             style={{ flex: 1 }}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 50, paddingTop: 2 }}
+            refreshControl={
+              <AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
           >
             {activeTab === 'shops' ? (
               // SHOPS LIST: Styled exactly like Nearby Shops list format with image thumbnail

@@ -158,6 +158,7 @@ export interface ServiceItem {
   priceLabel: string;
   location: string;
   description: string | null;
+  imageUrl?: string | null;
   isAvailable: boolean;
 }
 
@@ -234,6 +235,7 @@ export interface DigitalServiceProviderItem {
   description: string | null;
   isAvailable: boolean;
   badge: string | null;
+  imageUrl?: string | null;
 }
 
 export function useTransport(
@@ -290,6 +292,7 @@ export interface DealItem {
   merchantName: string;
   validUntil: string | null;
   linkUrl: string | null;
+  imageUrl?: string | null;
   isActive: boolean;
 }
 
@@ -492,7 +495,7 @@ export interface JoinRequestItem {
   userId: string;
   shopName: string;
   description: string;
-  role: 'MERCHANT' | 'LABOR' | 'TRANSPORT';
+  role: 'MERCHANT' | 'MANUAL_SERVICE_PROVIDER' | 'DIGITAL_SERVICE_PROVIDER' | 'LABOR' | 'TRANSPORT';
   serviceType?: string | null;
   customService?: string | null;
   location: string;

@@ -5,9 +5,30 @@ import { Role } from '@prisma/client';
 
 const router = Router();
 
-// Allowed roles for joining: Shop Keeper (MERCHANT), Service Provider (LABOR), Transport (TRANSPORT)
+// Allowed roles for joining: Shop Keeper (MERCHANT), Manual Service Provider, Digital Service Provider, Transport (TRANSPORT)
 // SUPER_ADMIN and DEVELOPER are strictly disallowed
-const ALLOWED_JOIN_ROLES: Role[] = [Role.MERCHANT, Role.LABOR, Role.TRANSPORT];
+const ALLOWED_JOIN_ROLES: Role[] = [
+  Role.MERCHANT,
+  Role.MANUAL_SERVICE_PROVIDER,
+  Role.DIGITAL_SERVICE_PROVIDER,
+  Role.TRANSPORT,
+];
+
+// Helper function for role display name
+const getRoleDisplayName = (r: Role) => {
+  switch (r) {
+    case Role.MERCHANT:
+      return 'Shop Keeper';
+    case Role.MANUAL_SERVICE_PROVIDER:
+      return 'Manual Service Provider';
+    case Role.DIGITAL_SERVICE_PROVIDER:
+      return 'Digital Service Provider';
+    case Role.TRANSPORT:
+      return 'Transport';
+    default:
+      return String(r);
+  }
+};
 
 /**
  * POST /api/join-requests
@@ -42,7 +63,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res: Respo
 
     if (!role || !ALLOWED_JOIN_ROLES.includes(role as Role)) {
       return res.status(400).json({
-        error: 'Invalid role selected. Allowed choices: Shop Keeper, Service Provider, or Transport.',
+        error: 'Invalid role selected. Allowed choices: Shop Keeper, Manual Service Provider, Digital Service Provider, or Transport.',
       });
     }
 
@@ -58,10 +79,73 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res: Respo
       return res.status(400).json({ error: 'Please provide a valid contact email.' });
     }
 
-    // If Service Provider (LABOR), validate service type
-    if (role === Role.LABOR && !serviceType) {
+    const roleEnum = role as Role;
+    const roleName = getRoleDisplayName(roleEnum);
+
+    // 1. Check if user is already verified/active in this role
+    const currentUser = await prisma.user.findUnique({ where: { id: userId } });
+    if (currentUser?.role === roleEnum) {
       return res.status(400).json({
-        error: 'Please select the type of digital service you provide.',
+        error: `Your account is already active as a ${roleName}. You cannot apply for the same position again.`,
+      });
+    }
+
+    // 2. Check if this user already applied for this opening/role (PENDING or APPROVED)
+    const existingUserRoleRequest = await prisma.joinRequest.findFirst({
+      where: {
+        userId,
+        role: roleEnum,
+        status: { in: ['PENDING', 'APPROVED'] },
+      },
+    });
+    if (existingUserRoleRequest) {
+      const statusDesc = existingUserRoleRequest.status === 'APPROVED' ? 'already approved' : 'currently pending review';
+      return res.status(400).json({
+        error: `You already have an application for the "${roleName}" opening that is ${statusDesc}. A single provider cannot apply for the same position more than once.`,
+      });
+    }
+
+    // 3. Check if a company or shop with the same name has already applied for this opening (case-insensitive)
+    const existingShopRequest = await prisma.joinRequest.findFirst({
+      where: {
+        shopName: { equals: shopName.trim(), mode: 'insensitive' },
+        role: roleEnum,
+        status: { in: ['PENDING', 'APPROVED'] },
+      },
+    });
+    if (existingShopRequest) {
+      const statusDesc = existingShopRequest.status === 'APPROVED' ? 'already approved' : 'currently pending review';
+      return res.status(400).json({
+        error: `An application for "${shopName.trim()}" for the "${roleName}" opening is ${statusDesc}. A single company, shop, or service provider cannot apply for the same position more than once.`,
+      });
+    }
+
+    // 4. Check if the contact phone or email has already applied for this opening
+    const existingContact = await prisma.joinRequest.findFirst({
+      where: {
+        role: roleEnum,
+        status: { in: ['PENDING', 'APPROVED'] },
+        OR: [
+          { phone: phone.trim() },
+          { email: { equals: email.trim(), mode: 'insensitive' } },
+        ],
+      },
+    });
+    if (existingContact) {
+      const statusDesc = existingContact.status === 'APPROVED' ? 'already approved' : 'currently pending review';
+      return res.status(400).json({
+        error: `An application using this contact phone or email for the "${roleName}" position is ${statusDesc}. Duplicate applications for the same opening are strictly not permitted.`,
+      });
+    }
+
+    // If Service Provider, validate service type
+    const isServiceProvider =
+      role === Role.MANUAL_SERVICE_PROVIDER ||
+      role === Role.DIGITAL_SERVICE_PROVIDER;
+
+    if (isServiceProvider && !serviceType) {
+      return res.status(400).json({
+        error: 'Please select the type of service you provide.',
       });
     }
 
@@ -113,14 +197,8 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res: Respo
     await prisma.notification.create({
       data: {
         title: 'New Join Request Received',
-        message: `${shopName} requested to join as ${
-          role === Role.MERCHANT
-            ? 'Shop Keeper'
-            : role === Role.LABOR
-            ? 'Service Provider'
-            : 'Transport'
-        }. Please review in the Super Admin Dashboard.`,
-        type: 'alert',
+        message: `${shopName} requested to join as ${roleName}. Please review in the Super Admin Dashboard.`,
+        type: 'admin_only',
       },
     });
 
@@ -137,7 +215,7 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res: Respo
 
 /**
  * GET /api/join-requests/my-status
- * Check current user's latest join request
+ * Check current user's join requests & applied roles
  */
 router.get('/my-status', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -146,12 +224,21 @@ router.get('/my-status', authenticateToken, async (req: AuthenticatedRequest, re
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const latest = await prisma.joinRequest.findFirst({
+    const allRequests = await prisma.joinRequest.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
     });
 
-    return res.json({ joinRequest: latest });
+    const latest = allRequests[0] || null;
+    const appliedRoles = allRequests
+      .filter((r) => r.status === 'PENDING' || r.status === 'APPROVED')
+      .map((r) => r.role);
+
+    return res.json({
+      joinRequest: latest,
+      allRequests,
+      appliedRoles,
+    });
   } catch (error: any) {
     console.error('Error fetching my join request status:', error);
     return res.status(500).json({ error: 'Failed to fetch status.' });
@@ -296,8 +383,10 @@ router.patch('/:id/approve', authenticateToken, async (req: AuthenticatedRequest
     const roleFriendlyName =
       request.role === Role.MERCHANT
         ? 'Shop Keeper'
-        : request.role === Role.LABOR
-        ? 'Service Provider'
+        : request.role === Role.DIGITAL_SERVICE_PROVIDER
+        ? 'Digital Service Provider'
+        : request.role === Role.MANUAL_SERVICE_PROVIDER
+        ? 'Manual Service Provider'
         : 'Transport Operator';
 
     await prisma.notification.create({

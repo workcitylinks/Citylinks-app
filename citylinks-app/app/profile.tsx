@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Location from 'expo-location';
 import { 
   ArrowLeft, 
   User, 
@@ -30,7 +31,8 @@ import {
   Store,
   Laptop,
   Truck,
-  Users
+  Users,
+  Crosshair,
 } from 'lucide-react-native';
 import { apiClient } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
@@ -41,6 +43,7 @@ import { useProfile, UserProfile } from '../queries/marketplaceQueries';
 export default function ProfileScreen() {
   const { showSuccess, showError } = useToast();
   const { switchUserRole, refreshAuth: refreshAppAuth } = useApp();
+  const [fetchingLocation, setFetchingLocation] = useState(false);
   const { 
     profile, 
     loading, 
@@ -150,6 +153,51 @@ export default function ProfileScreen() {
     setEditModalVisible(true);
   };
 
+  const handleAutoFetchLocation = async () => {
+    try {
+      setFetchingLocation(true);
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        showError(
+          'Permission to access location was denied. Please allow location access in your device settings.',
+          'Location Required'
+        );
+        return;
+      }
+      const currentLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      const [reverseGeocode] = await Location.reverseGeocodeAsync({
+        latitude: currentLocation.coords.latitude,
+        longitude: currentLocation.coords.longitude,
+      });
+      if (reverseGeocode) {
+        const parts = [
+          reverseGeocode.name || reverseGeocode.streetNumber,
+          reverseGeocode.street,
+          reverseGeocode.district || reverseGeocode.subregion,
+          reverseGeocode.city,
+          reverseGeocode.region || 'Karnataka',
+          reverseGeocode.postalCode,
+        ].filter(Boolean);
+        const fullAddr = parts.join(', ');
+        const locality =
+          reverseGeocode.district ||
+          reverseGeocode.city ||
+          reverseGeocode.subregion ||
+          'Haveri';
+        setFormData(prev => ({ ...prev, address: fullAddr || `${locality}, Haveri, Karnataka` }));
+        showSuccess(`Detected: ${locality}`, 'Location Fetched');
+      } else {
+        showError('Could not decode device coordinates into a street address.', 'Geocoding Error');
+      }
+    } catch (err: any) {
+      showError(err.message || 'Unable to retrieve location.', 'GPS Error');
+    } finally {
+      setFetchingLocation(false);
+    }
+  };
+
   const handleSaveProfile = async () => {
     try {
       setSaving(true);
@@ -200,8 +248,11 @@ export default function ProfileScreen() {
         return 'Developer';
       case 'MERCHANT':
         return 'Merchant';
+      case 'MANUAL_SERVICE_PROVIDER':
       case 'LABOR':
-        return 'Worker';
+        return 'Manual Service Provider';
+      case 'DIGITAL_SERVICE_PROVIDER':
+        return 'Digital Service Provider';
       case 'TRANSPORT':
         return 'Transport';
       case 'CUSTOMER':
@@ -522,11 +573,40 @@ export default function ProfileScreen() {
                 />
               </View>
 
-              {/* Address */}
+              {/* Address with Auto GPS Fetching and Manual Entry */}
               <View className="mb-4">
-                <Text className="text-xs font-semibold text-slate-700 mb-1.5">Address</Text>
+                <View className="flex-row items-center justify-between mb-1.5">
+                  <View className="flex-row items-center">
+                    <MapPin size={14} color="#2563eb" />
+                    <Text className="text-xs font-semibold text-slate-700 ml-1">Address</Text>
+                  </View>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    disabled={fetchingLocation}
+                    onPress={handleAutoFetchLocation}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: '#eff6ff',
+                      paddingHorizontal: 9,
+                      paddingVertical: 4.5,
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: '#bfdbfe',
+                    }}
+                  >
+                    {fetchingLocation ? (
+                      <ActivityIndicator size="small" color="#2563eb" style={{ marginRight: 4 }} />
+                    ) : (
+                      <Crosshair size={12} color="#2563eb" strokeWidth={2.5} style={{ marginRight: 4 }} />
+                    )}
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#1d4ed8' }}>
+                      {fetchingLocation ? 'Locating...' : 'Auto Fetch Location'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
                 <TextInput
-                  placeholder="Enter your address"
+                  placeholder="Enter your doorstep or shop address"
                   multiline
                   numberOfLines={2}
                   value={formData.address}

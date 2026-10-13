@@ -31,7 +31,8 @@ model User {
 enum Role {
   CUSTOMER
   MERCHANT
-  LABOR
+  MANUAL_SERVICE_PROVIDER
+  DIGITAL_SERVICE_PROVIDER
   TRANSPORT
   SUPER_ADMIN
   DEVELOPER
@@ -117,6 +118,7 @@ model Service {
   priceLabel  String   // e.g. ₹299 onwards
   location    String   @default("Haveri Region")
   description String?
+  imageUrl    String?
   isAvailable Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -202,6 +204,7 @@ model DigitalServiceProvider {
   priceLabel  String   // e.g. "₹2,999 onwards"
   location    String   @default("Haveri Region")
   description String?
+  imageUrl    String?
   isAvailable Boolean  @default(true)
   badge       String?  @default("Verified")
   createdAt   DateTime @default(now())

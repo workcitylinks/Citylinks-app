@@ -47,7 +47,7 @@ import { useToast } from '../context/ToastContext';
 import { apiClient } from '../api/apiClient';
 
 interface RoleOption {
-  id: 'MERCHANT' | 'LABOR' | 'TRANSPORT';
+  id: 'MERCHANT' | 'MANUAL_SERVICE_PROVIDER' | 'DIGITAL_SERVICE_PROVIDER' | 'LABOR' | 'TRANSPORT';
   label: string;
   sublabel: string;
   icon: any;
@@ -65,12 +65,20 @@ const JOIN_ROLES: RoleOption[] = [
     bg: '#fff7ed',
   },
   {
-    id: 'LABOR',
-    label: 'Service Provider',
-    sublabel: 'Digital services, tech assistance, printing, repairs & freelancing',
+    id: 'MANUAL_SERVICE_PROVIDER',
+    label: 'Manual Service Provider',
+    sublabel: 'Electrician, plumber, mechanic, carpenter, repair & technicians',
     icon: Wrench,
     color: '#16a34a',
     bg: '#f0fdf4',
+  },
+  {
+    id: 'DIGITAL_SERVICE_PROVIDER',
+    label: 'Digital Service Provider',
+    sublabel: 'Web development, SEO, graphics, digital marketing & tech solutions',
+    icon: Sparkles,
+    color: '#8b5cf6',
+    bg: '#f5f3ff',
   },
   {
     id: 'TRANSPORT',
@@ -80,6 +88,19 @@ const JOIN_ROLES: RoleOption[] = [
     color: '#0891b2',
     bg: '#ecfeff',
   },
+];
+
+const MANUAL_SERVICE_OPTIONS = [
+  'Electrician',
+  'Plumber',
+  'AC & Appliance Repair',
+  'Carpenter & Woodwork',
+  'Mechanic & Auto Service',
+  'Painter & Whitewashing',
+  'Welder & Fabrication',
+  'Mason & Construction',
+  'Cleaning & Housekeeping',
+  'Others',
 ];
 
 const DIGITAL_SERVICE_OPTIONS = [
@@ -111,7 +132,7 @@ export default function JoinUsScreen() {
 
   const [shopName, setShopName] = useState('');
   const [description, setDescription] = useState('');
-  const [selectedRole, setSelectedRole] = useState<'MERCHANT' | 'LABOR' | 'TRANSPORT'>('MERCHANT');
+  const [selectedRole, setSelectedRole] = useState<'MERCHANT' | 'MANUAL_SERVICE_PROVIDER' | 'DIGITAL_SERVICE_PROVIDER' | 'LABOR' | 'TRANSPORT'>('MERCHANT');
   const [location, setLocation] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -128,11 +149,15 @@ export default function JoinUsScreen() {
   const [pickingPhoto, setPickingPhoto] = useState(false);
 
   // Service Provider specific states
+  const [manualServiceType, setManualServiceType] = useState('Electrician');
+  const [customManualService, setCustomManualService] = useState('');
+
   const [serviceType, setServiceType] = useState('Website Creation');
   const [customService, setCustomService] = useState('');
 
   // Dropdown modals
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
+  const [manualServiceDropdownOpen, setManualServiceDropdownOpen] = useState(false);
   const [serviceDropdownOpen, setServiceDropdownOpen] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
@@ -141,6 +166,8 @@ export default function JoinUsScreen() {
   // Existing Join Request Status
   const [checkingStatus, setCheckingStatus] = useState(true);
   const [existingRequest, setExistingRequest] = useState<any | null>(null);
+  const [appliedRoles, setAppliedRoles] = useState<string[]>([]);
+  const [allRequests, setAllRequests] = useState<any[]>([]);
 
   const fetchMyStatus = async (showToast = false) => {
     if (!userToken) {
@@ -157,6 +184,12 @@ export default function JoinUsScreen() {
         }
       } else {
         setExistingRequest(null);
+      }
+      if (res.data?.appliedRoles) {
+        setAppliedRoles(res.data.appliedRoles);
+      }
+      if (res.data?.allRequests) {
+        setAllRequests(res.data.allRequests);
       }
     } catch (err: any) {
       console.warn('Failed to fetch request status:', err);
@@ -294,10 +327,23 @@ export default function JoinUsScreen() {
     }
   }, [userData]);
 
+  const isRoleAlreadyApplied =
+    appliedRoles.includes(selectedRole) ||
+    (userData?.role === selectedRole) ||
+    allRequests.some((r) => r.role === selectedRole && (r.status === 'PENDING' || r.status === 'APPROVED'));
+
   const handleSubmit = async () => {
     if (!userToken) {
       showError('Please sign in or create an account to join CityLinks.', 'Sign In Required');
       router.push('/auth' as any);
+      return;
+    }
+
+    if (isRoleAlreadyApplied) {
+      showError(
+        `You have already submitted an application for ${activeRoleObj.label}. Each business or provider can apply for an opening only once.`,
+        'Duplicate Application'
+      );
       return;
     }
 
@@ -337,35 +383,56 @@ export default function JoinUsScreen() {
       }
     }
 
-    if (selectedRole === 'LABOR') {
+    if (selectedRole === 'MANUAL_SERVICE_PROVIDER' || selectedRole === 'LABOR') {
+      if (!manualServiceType) {
+        showError('Please choose the type of manual service you provide.', 'Missing Field');
+        return;
+      }
+      if ((manualServiceType === 'Others' || manualServiceType === 'Other') && !customManualService.trim()) {
+        showError('Please specify the manual service you provide.', 'Missing Field');
+        return;
+      }
+    }
+
+    if (selectedRole === 'DIGITAL_SERVICE_PROVIDER') {
       if (!serviceType) {
-        showError('Please choose the type of service you provide.', 'Missing Field');
+        showError('Please choose the type of digital service you provide.', 'Missing Field');
         return;
       }
       if ((serviceType === 'Others' || serviceType === 'Other') && !customService.trim()) {
-        showError('Please specify the service you provide.', 'Missing Field');
+        showError('Please specify the digital service you provide.', 'Missing Field');
         return;
       }
     }
 
     try {
       setSubmitting(true);
+      const isManual = selectedRole === 'MANUAL_SERVICE_PROVIDER' || selectedRole === 'LABOR';
+      const isDigital = selectedRole === 'DIGITAL_SERVICE_PROVIDER';
+      const isShop = selectedRole === 'MERCHANT';
+
+      const resolvedServiceType = isShop
+        ? (isOtherCategory ? customCategory.trim() : shopCategory)
+        : isManual
+        ? manualServiceType
+        : isDigital
+        ? serviceType
+        : undefined;
+
+      const resolvedCustomService = isShop && isOtherCategory
+        ? customCategory.trim()
+        : isManual && (manualServiceType === 'Others' || manualServiceType === 'Other')
+        ? customManualService.trim()
+        : isDigital && (serviceType === 'Others' || serviceType === 'Other')
+        ? customService.trim()
+        : undefined;
+
       const res = await apiClient.post('/join-requests', {
         shopName: shopName.trim(),
         description: description.trim(),
         role: selectedRole,
-        serviceType:
-          selectedRole === 'MERCHANT'
-            ? (isOtherCategory ? customCategory.trim() : shopCategory)
-            : selectedRole === 'LABOR'
-            ? serviceType
-            : undefined,
-        customService:
-          selectedRole === 'MERCHANT' && isOtherCategory
-            ? customCategory.trim()
-            : selectedRole === 'LABOR' && (serviceType === 'Others' || serviceType === 'Other')
-            ? customService.trim()
-            : undefined,
+        serviceType: resolvedServiceType,
+        customService: resolvedCustomService,
         location: location.trim(),
         phone: phone.trim(),
         email: email.trim(),
@@ -412,8 +479,10 @@ export default function JoinUsScreen() {
     const isMerchant = existingRequest.role === 'MERCHANT';
     const roleLabel = isMerchant
       ? 'Shop Keeper'
-      : existingRequest.role === 'LABOR'
-      ? 'Service Provider'
+      : existingRequest.role === 'MANUAL_SERVICE_PROVIDER' || existingRequest.role === 'LABOR'
+      ? 'Manual Service Provider'
+      : existingRequest.role === 'DIGITAL_SERVICE_PROVIDER'
+      ? 'Digital Service Provider'
       : 'Transport';
 
     const formattedDate = existingRequest.createdAt
@@ -726,15 +795,11 @@ export default function JoinUsScreen() {
             <Text className="text-slate-700 font-bold text-sm">Refresh Application Status</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => setExistingRequest(null)}
-            className="py-2 items-center justify-center"
-          >
-            <Text className="text-xs text-slate-400 font-semibold underline">
-              Need to change details? Submit a revised application
+          <View className="py-2.5 items-center justify-center">
+            <Text className="text-xs text-slate-400 font-semibold text-center">
+              🔒 One Application Per Position • Duplicate applications are prohibited
             </Text>
-          </TouchableOpacity>
+          </View>
         </ScrollView>
       </View>
     );
@@ -769,16 +834,43 @@ export default function JoinUsScreen() {
             You're an Approved Partner!
           </Text>
           <Text className="text-sm text-slate-500 text-center mb-6 leading-relaxed">
-            Your application for <Text className="font-bold text-slate-800">{existingRequest.shopName}</Text> has been approved by the Super Admin. Your merchant features are active.
+            Your application for <Text className="font-bold text-slate-800">{existingRequest.shopName}</Text> has been approved by the Super Admin.{' '}
+            {existingRequest.role === 'MERCHANT'
+              ? 'Your merchant store features are active.'
+              : existingRequest.role === 'MANUAL_SERVICE_PROVIDER' || existingRequest.role === 'LABOR'
+              ? 'Your manual service provider features are active.'
+              : existingRequest.role === 'DIGITAL_SERVICE_PROVIDER'
+              ? 'Your digital specialist features are active.'
+              : 'Your partner features are active.'}
           </Text>
 
           <TouchableOpacity
             activeOpacity={0.85}
-            onPress={() => router.replace(isMerchant ? ('/merchant-dashboard' as any) : ('/dashboard' as any))}
+            onPress={() => {
+              if (isMerchant) {
+                router.replace('/merchant-dashboard' as any);
+              } else if (
+                existingRequest.role === 'MANUAL_SERVICE_PROVIDER' ||
+                existingRequest.role === 'LABOR'
+              ) {
+                router.replace('/manual-service-dashboard' as any);
+              } else if (existingRequest.role === 'DIGITAL_SERVICE_PROVIDER') {
+                router.replace('/digital-service-dashboard' as any);
+              } else {
+                router.replace('/dashboard' as any);
+              }
+            }}
             className="w-full py-4 rounded-2xl bg-orange-600 items-center justify-center shadow-lg shadow-orange-300 mb-3"
           >
             <Text className="text-white font-bold text-base">
-              {isMerchant ? 'Open Merchant Dashboard' : 'Open Partner Dashboard'}
+              {isMerchant
+                ? 'Open Merchant Dashboard'
+                : existingRequest.role === 'MANUAL_SERVICE_PROVIDER' ||
+                  existingRequest.role === 'LABOR'
+                ? 'Open Manual Service Hub'
+                : existingRequest.role === 'DIGITAL_SERVICE_PROVIDER'
+                ? 'Open Digital Specialist Hub'
+                : 'Open Partner Dashboard'}
             </Text>
           </TouchableOpacity>
 
@@ -886,6 +978,31 @@ export default function JoinUsScreen() {
                 </View>
                 <ChevronDown size={18} color="#64748b" />
               </TouchableOpacity>
+
+              {isRoleAlreadyApplied && (
+                <View
+                  style={{
+                    marginTop: 10,
+                    backgroundColor: '#fff7ed',
+                    borderWidth: 1.5,
+                    borderColor: '#fdba74',
+                    borderRadius: 16,
+                    padding: 12,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                  }}
+                >
+                  <AlertCircle size={20} color="#ea580c" style={{ marginRight: 10 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#9a3412' }}>
+                      Application Already Submitted
+                    </Text>
+                    <Text style={{ fontSize: 11, color: '#c2410c', marginTop: 2 }}>
+                      You already have an active or approved registration for {activeRoleObj.label}. Each business or provider cannot apply for the same opening more than once.
+                    </Text>
+                  </View>
+                </View>
+              )}
             </View>
 
             {/* 3a. If Shop Keeper: Category selector with chips + Other option */}
@@ -995,8 +1112,8 @@ export default function JoinUsScreen() {
               </View>
             )}
 
-            {/* 3b. If Service Provider: Which type of digital service provider */}
-            {selectedRole === 'LABOR' && (
+            {/* 3b. If Manual Service Provider: Which type of manual service */}
+            {(selectedRole === 'MANUAL_SERVICE_PROVIDER' || selectedRole === 'LABOR') && (
               <View
                 style={{
                   marginTop: 16,
@@ -1008,29 +1125,78 @@ export default function JoinUsScreen() {
                 }}
               >
                 <Text className="text-xs font-bold text-emerald-900 uppercase tracking-wider mb-2">
-                  Which type of Digital Service Provider? *
+                  Which type of Manual Service / Trade? *
                 </Text>
                 <TouchableOpacity
                   activeOpacity={0.8}
-                  onPress={() => setServiceDropdownOpen(true)}
+                  onPress={() => setManualServiceDropdownOpen(true)}
                   className="flex-row items-center justify-between bg-white border border-emerald-200 rounded-xl px-3.5 py-3 mb-3"
                 >
                   <View className="flex-row items-center flex-1">
-                    <Layers size={18} color="#16a34a" />
+                    <Wrench size={18} color="#16a34a" />
                     <Text className="ml-2.5 text-sm font-semibold text-slate-800">
-                      {serviceType}
+                      {manualServiceType}
                     </Text>
                   </View>
                   <ChevronDown size={18} color="#16a34a" />
                 </TouchableOpacity>
 
+                {/* If 'Others' selected, add option to type custom manual service */}
+                {(manualServiceType === 'Others' || manualServiceType === 'Other') && (
+                  <View className="mt-1">
+                    <Text className="text-xs font-semibold text-emerald-800 mb-1.5">
+                      Specify the trade / manual service you provide *
+                    </Text>
+                    <View className="flex-row items-center bg-white border border-emerald-300 rounded-xl px-3.5 py-2.5">
+                      <TextInput
+                        value={customManualService}
+                        onChangeText={setCustomManualService}
+                        placeholder="e.g. Mason, painter, borewell technician, glass fitter"
+                        placeholderTextColor="#94a3b8"
+                        className="flex-1 text-sm text-slate-800"
+                      />
+                    </View>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* 3c. If Digital Service Provider: Which type of digital service */}
+            {selectedRole === 'DIGITAL_SERVICE_PROVIDER' && (
+              <View
+                style={{
+                  marginTop: 16,
+                  backgroundColor: '#f5f3ff',
+                  padding: 16,
+                  borderRadius: 16,
+                  borderWidth: 1,
+                  borderColor: '#ddd6fe',
+                }}
+              >
+                <Text className="text-xs font-bold text-purple-900 uppercase tracking-wider mb-2">
+                  Which type of Digital Service Provider? *
+                </Text>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setServiceDropdownOpen(true)}
+                  className="flex-row items-center justify-between bg-white border border-purple-200 rounded-xl px-3.5 py-3 mb-3"
+                >
+                  <View className="flex-row items-center flex-1">
+                    <Sparkles size={18} color="#8b5cf6" />
+                    <Text className="ml-2.5 text-sm font-semibold text-slate-800">
+                      {serviceType}
+                    </Text>
+                  </View>
+                  <ChevronDown size={18} color="#8b5cf6" />
+                </TouchableOpacity>
+
                 {/* If 'Others' selected, add option to type custom service */}
                 {(serviceType === 'Others' || serviceType === 'Other') && (
                   <View className="mt-1">
-                    <Text className="text-xs font-semibold text-emerald-800 mb-1.5">
-                      Specify the service you provide *
+                    <Text className="text-xs font-semibold text-purple-800 mb-1.5">
+                      Specify the digital service you provide *
                     </Text>
-                    <View className="flex-row items-center bg-white border border-emerald-300 rounded-xl px-3.5 py-2.5">
+                    <View className="flex-row items-center bg-white border border-purple-300 rounded-xl px-3.5 py-2.5">
                       <TextInput
                         value={customService}
                         onChangeText={setCustomService}
@@ -1273,16 +1439,32 @@ export default function JoinUsScreen() {
             {/* Submit Button */}
             <TouchableOpacity
               activeOpacity={0.85}
-              disabled={submitting}
+              disabled={submitting || isRoleAlreadyApplied}
               onPress={handleSubmit}
-              className="mt-6 w-full py-4 rounded-2xl bg-indigo-600 items-center justify-center shadow-lg shadow-indigo-300 flex-row"
+              style={{
+                marginTop: 24,
+                width: '100%',
+                paddingVertical: 16,
+                borderRadius: 16,
+                backgroundColor: isRoleAlreadyApplied ? '#94a3b8' : '#4f46e5',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'row',
+                shadowColor: isRoleAlreadyApplied ? '#000000' : '#4f46e5',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: isRoleAlreadyApplied ? 0.05 : 0.25,
+                shadowRadius: 8,
+                elevation: 4,
+              }}
             >
               {submitting ? (
                 <ActivityIndicator size="small" color="#ffffff" />
               ) : (
                 <>
                   <Sparkles size={18} color="#ffffff" className="mr-2" />
-                  <Text className="text-white font-bold text-base ml-2">Send Request</Text>
+                  <Text className="text-white font-bold text-base ml-2">
+                    {isRoleAlreadyApplied ? 'Already Applied for this Position' : 'Send Request'}
+                  </Text>
                 </>
               )}
             </TouchableOpacity>
@@ -1317,6 +1499,10 @@ export default function JoinUsScreen() {
               {JOIN_ROLES.map((roleItem) => {
                 const ItemIcon = roleItem.icon;
                 const isSelected = selectedRole === roleItem.id;
+                const isItemAlreadyApplied =
+                  appliedRoles.includes(roleItem.id) ||
+                  (userData?.role === roleItem.id) ||
+                  allRequests.some((r) => r.role === roleItem.id && (r.status === 'PENDING' || r.status === 'APPROVED'));
 
                 return (
                   <TouchableOpacity
@@ -1351,15 +1537,31 @@ export default function JoinUsScreen() {
                       <ItemIcon size={20} color={roleItem.color} />
                     </View>
                     <View className="flex-1 mr-2">
-                      <Text
-                        style={{
-                          fontSize: 15,
-                          fontWeight: '700',
-                          color: isSelected ? roleItem.color : '#0f172a',
-                        }}
-                      >
-                        {roleItem.label}
-                      </Text>
+                      <View className="flex-row items-center gap-2">
+                        <Text
+                          style={{
+                            fontSize: 15,
+                            fontWeight: '700',
+                            color: isSelected ? roleItem.color : '#0f172a',
+                          }}
+                        >
+                          {roleItem.label}
+                        </Text>
+                        {isItemAlreadyApplied && (
+                          <View
+                            style={{
+                              backgroundColor: '#fee2e2',
+                              paddingHorizontal: 6,
+                              paddingVertical: 2,
+                              borderRadius: 6,
+                            }}
+                          >
+                            <Text style={{ fontSize: 9, fontWeight: '800', color: '#b91c1c' }}>
+                              ALREADY APPLIED
+                            </Text>
+                          </View>
+                        )}
+                      </View>
                       <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
                         {roleItem.sublabel}
                       </Text>
@@ -1386,6 +1588,62 @@ export default function JoinUsScreen() {
             <TouchableOpacity
               onPress={() => setRoleDropdownOpen(false)}
               className="mt-3 w-full py-3 rounded-xl bg-slate-100 items-center justify-center"
+            >
+              <Text className="text-slate-700 font-semibold text-sm">Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Manual Service Type Picker Modal */}
+      <Modal
+        visible={manualServiceDropdownOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setManualServiceDropdownOpen(false)}
+      >
+        <View className="flex-1 bg-black/50 justify-center items-center px-5">
+          <View className="bg-white rounded-3xl p-5 w-full max-w-md shadow-2xl border border-slate-100 max-h-[80%]">
+            <Text className="text-base font-bold text-slate-900 mb-1">
+              Select Manual Service / Trade
+            </Text>
+            <Text className="text-xs text-slate-400 mb-3">
+              What kind of manual service or technical skill do you provide?
+            </Text>
+
+            <ScrollView showsVerticalScrollIndicator={false} className="mb-3">
+              {MANUAL_SERVICE_OPTIONS.map((opt) => {
+                const isSelected = manualServiceType === opt;
+                return (
+                  <TouchableOpacity
+                    key={opt}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      setManualServiceType(opt);
+                      setManualServiceDropdownOpen(false);
+                    }}
+                    className={`flex-row items-center justify-between p-3.5 rounded-xl border mb-2 ${
+                      isSelected
+                        ? 'border-emerald-500 bg-emerald-50'
+                        : 'border-slate-100 bg-slate-50'
+                    }`}
+                  >
+                    <Text
+                      className={`text-sm ${
+                        isSelected ? 'font-bold text-emerald-800' : 'font-medium text-slate-700'
+                      }`}
+                    >
+                      {opt}
+                    </Text>
+                    {isSelected && <Check size={16} color="#16a34a" strokeWidth={2.5} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <TouchableOpacity
+              onPress={() => setManualServiceDropdownOpen(false)}
+              className="w-full py-3 rounded-xl bg-slate-100 items-center justify-center"
             >
               <Text className="text-slate-700 font-semibold text-sm">Cancel</Text>
             </TouchableOpacity>

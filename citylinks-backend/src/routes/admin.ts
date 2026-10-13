@@ -26,6 +26,8 @@ router.get('/gui-analytics', authenticateToken, async (req: AuthenticatedRequest
     const roleMap: Record<string, number> = {
       CUSTOMER: 0,
       MERCHANT: 0,
+      MANUAL_SERVICE_PROVIDER: 0,
+      DIGITAL_SERVICE_PROVIDER: 0,
       LABOR: 0,
       TRANSPORT: 0,
       SUPER_ADMIN: 0,
@@ -35,6 +37,9 @@ router.get('/gui-analytics', authenticateToken, async (req: AuthenticatedRequest
     rawRoleCounts.forEach((r) => {
       roleMap[r.role] = r._count._all;
     });
+
+    // Combine legacy LABOR into MANUAL_SERVICE_PROVIDER for count display
+    const manualCount = (roleMap.MANUAL_SERVICE_PROVIDER || 0) + (roleMap.LABOR || 0);
 
     // Calculate role percentages & details (excluding DEVELOPER from Super Admin view as requested)
     const roleStats = [
@@ -57,13 +62,22 @@ router.get('/gui-analytics', authenticateToken, async (req: AuthenticatedRequest
         description: 'Store owners & retail merchants',
       },
       {
-        role: 'LABOR',
-        label: 'Service Providers',
-        count: roleMap.LABOR || 0,
-        percentage: totalUsers > 0 ? Math.round(((roleMap.LABOR || 0) / totalUsers) * 100) : 0,
+        role: 'MANUAL_SERVICE_PROVIDER',
+        label: 'Manual Service Providers',
+        count: manualCount,
+        percentage: totalUsers > 0 ? Math.round((manualCount / totalUsers) * 100) : 0,
         color: '#16a34a',
         bg: '#f0fdf4',
-        description: 'Digital specialists & technicians',
+        description: 'Technicians, mechanics, carpenters & repair specialists',
+      },
+      {
+        role: 'DIGITAL_SERVICE_PROVIDER',
+        label: 'Digital Service Providers',
+        count: roleMap.DIGITAL_SERVICE_PROVIDER || 0,
+        percentage: totalUsers > 0 ? Math.round(((roleMap.DIGITAL_SERVICE_PROVIDER || 0) / totalUsers) * 100) : 0,
+        color: '#7c3aed',
+        bg: '#f5f3ff',
+        description: 'Web development, marketing, printing & digital creators',
       },
       {
         role: 'TRANSPORT',

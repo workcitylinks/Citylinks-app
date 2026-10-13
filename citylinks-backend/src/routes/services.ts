@@ -149,8 +149,8 @@ router.get('/categories', cacheResponse(300), async (req, res) => {
 // GET /api/services - Filter by category or search term
 router.get('/', cacheResponse(120), async (req, res) => {
   try {
-    const { category, q } = req.query;
-    let whereCondition: any = { isAvailable: true };
+    const { category, q, providerName, all } = req.query;
+    let whereCondition: any = all === 'true' ? {} : { isAvailable: true };
 
     if (category && typeof category === 'string' && category.toLowerCase() !== 'all') {
       const catTrim = category.trim();
@@ -162,6 +162,10 @@ router.get('/', cacheResponse(120), async (req, res) => {
       } else {
         whereCondition.category = { equals: catTrim, mode: 'insensitive' };
       }
+    }
+
+    if (providerName && typeof providerName === 'string' && providerName.trim().length > 0) {
+      whereCondition.providerName = { equals: providerName.trim(), mode: 'insensitive' };
     }
 
     if (q && typeof q === 'string' && q.trim().length > 0) {
@@ -177,12 +181,104 @@ router.get('/', cacheResponse(120), async (req, res) => {
 
     const services = await prisma.service.findMany({
       where: whereCondition,
-      orderBy: { rating: 'desc' },
+      orderBy: { createdAt: 'desc' },
     });
 
     res.json(services);
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to fetch services' });
+  }
+});
+
+// POST /api/services - Add a new manual service
+router.post('/', async (req, res) => {
+  try {
+    const {
+      title,
+      category,
+      providerName,
+      phone,
+      priceLabel,
+      location,
+      description,
+      imageUrl,
+      isAvailable = true,
+    } = req.body;
+
+    if (!title || !title.trim()) {
+      return res.status(400).json({ error: 'Service title is required' });
+    }
+    if (!category || !category.trim()) {
+      return res.status(400).json({ error: 'Service category is required' });
+    }
+    if (!providerName || !providerName.trim()) {
+      return res.status(400).json({ error: 'Provider name is required' });
+    }
+
+    const newService = await prisma.service.create({
+      data: {
+        title: title.trim(),
+        category: category.trim(),
+        providerName: providerName.trim(),
+        phone: phone ? phone.trim() : null,
+        priceLabel: priceLabel ? priceLabel.trim() : 'Contact for quote',
+        location: location ? location.trim() : 'Haveri Region',
+        description: description ? description.trim() : null,
+        imageUrl: imageUrl && typeof imageUrl === 'string' && imageUrl.trim().length > 0 ? imageUrl.trim() : null,
+        rating: 4.9,
+        reviewCount: 1,
+        isAvailable: Boolean(isAvailable),
+      },
+    });
+
+    invalidateCache();
+
+    res.status(201).json({
+      success: true,
+      message: 'Service published to Book Services directory!',
+      service: newService,
+    });
+  } catch (err: any) {
+    console.error('Error creating service:', err);
+    res.status(500).json({ error: err.message || 'Failed to create service' });
+  }
+});
+
+// DELETE /api/services/:id - Remove a service
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.service.delete({
+      where: { id: String(id) },
+    });
+
+    invalidateCache();
+
+    res.json({ success: true, message: 'Service removed from directory' });
+  } catch (err: any) {
+    console.error('Error deleting service:', err);
+    res.status(500).json({ error: err.message || 'Failed to delete service' });
+  }
+});
+
+// PATCH /api/services/:id/availability - Toggle service availability
+router.patch('/:id/availability', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = await prisma.service.findUnique({ where: { id: String(id) } });
+    if (!existing) return res.status(404).json({ error: 'Service not found' });
+
+    const nextVal = req.body.isAvailable !== undefined ? Boolean(req.body.isAvailable) : !existing.isAvailable;
+    const updated = await prisma.service.update({
+      where: { id: String(id) },
+      data: { isAvailable: nextVal },
+    });
+
+    invalidateCache();
+
+    res.json({ success: true, service: updated });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to update availability' });
   }
 });
 

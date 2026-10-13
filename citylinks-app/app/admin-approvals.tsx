@@ -25,12 +25,23 @@ import {
 import { useToast } from '../context/ToastContext';
 import { useJoinRequests, JoinRequestItem } from '../queries/marketplaceQueries';
 import { apiClient } from '../api/apiClient';
+import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
 
 export default function AdminApprovalsScreen() {
   const { showSuccess, showError } = useToast();
   const [activeTab, setActiveTab] = useState<'PENDING' | 'APPROVED' | 'ALL'>('PENDING');
   const { requests, loading, refetch } = useJoinRequests(activeTab);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const handleApprove = async (request: JoinRequestItem) => {
     try {
@@ -96,6 +107,9 @@ export default function AdminApprovalsScreen() {
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
         {/* Header Summary Banner */}
         <View className="bg-purple-900 rounded-3xl p-5 mb-5 shadow-sm">
@@ -180,15 +194,19 @@ export default function AdminApprovalsScreen() {
               const roleLabel =
                 item.role === 'MERCHANT'
                   ? 'Shop Keeper'
-                  : item.role === 'LABOR'
-                  ? 'Service Provider'
+                  : item.role === 'MANUAL_SERVICE_PROVIDER' || item.role === 'LABOR'
+                  ? 'Manual Service Provider'
+                  : item.role === 'DIGITAL_SERVICE_PROVIDER'
+                  ? 'Digital Service Provider'
                   : 'Transport';
 
               const roleBadgeColor =
                 item.role === 'MERCHANT'
                   ? '#ea580c'
-                  : item.role === 'LABOR'
+                  : item.role === 'MANUAL_SERVICE_PROVIDER' || item.role === 'LABOR'
                   ? '#16a34a'
+                  : item.role === 'DIGITAL_SERVICE_PROVIDER'
+                  ? '#8b5cf6'
                   : '#0891b2';
 
               return (

@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import {
   ArrowLeft,
   Bell,
@@ -229,7 +229,7 @@ const SwipeableNotificationCard: React.FC<SwipeableNotificationCardProps> = ({
 };
 
 export default function NotificationsScreen() {
-  const { userToken, refreshNotificationCount } = useApp();
+  const { userToken, userData, refreshNotificationCount } = useApp();
   const { showSuccess, showError } = useToast();
 
   const [loading, setLoading] = useState(true);
@@ -285,6 +285,15 @@ export default function NotificationsScreen() {
     fetchNotifications();
   }, [userToken]);
 
+  useFocusEffect(
+    React.useCallback(() => {
+      if (userToken) {
+        fetchNotifications(true);
+        refreshNotificationCount();
+      }
+    }, [userToken])
+  );
+
   const onRefresh = () => {
     setRefreshing(true);
     fetchNotifications(true);
@@ -295,12 +304,31 @@ export default function NotificationsScreen() {
     return notifications.filter((n) => !n.isRead).length;
   }, [notifications]);
 
+  const isSuperAdmin = userData?.role === 'SUPER_ADMIN';
+
+  const visibleNotifications = useMemo(() => {
+    return notifications.filter((n) => {
+      const type = (n.type || '').toLowerCase();
+      const isAdminType =
+        type === 'admin_only' ||
+        type === 'admin' ||
+        type === 'admin_alert' ||
+        type === 'join_request' ||
+        type === 'super_admin' ||
+        type.startsWith('dept:super_admin');
+      if (isAdminType && !isSuperAdmin) {
+        return false;
+      }
+      return true;
+    });
+  }, [notifications, isSuperAdmin]);
+
   const filteredNotifications = useMemo(() => {
     if (activeTab === 'unread') {
-      return notifications.filter((n) => !n.isRead);
+      return visibleNotifications.filter((n) => !n.isRead);
     }
-    return notifications;
-  }, [notifications, activeTab]);
+    return visibleNotifications;
+  }, [visibleNotifications, activeTab]);
 
   const handleMarkAsRead = async (id: string, currentlyRead: boolean) => {
     if (currentlyRead) return;
@@ -514,7 +542,18 @@ export default function NotificationsScreen() {
               <SwipeableNotificationCard
                 key={n.id}
                 notification={n}
-                onPress={() => handleMarkAsRead(n.id, n.isRead)}
+                onPress={() => {
+                  handleMarkAsRead(n.id, n.isRead);
+                  const isDealOrOffer =
+                    n.type === 'promo' ||
+                    n.title.toLowerCase().includes('deal') ||
+                    n.title.toLowerCase().includes('offer') ||
+                    n.message.toLowerCase().includes('deal') ||
+                    n.message.toLowerCase().includes('offer');
+                  if (isDealOrOffer) {
+                    router.push('/deals');
+                  }
+                }}
                 onDelete={handleDeleteNotification}
                 formatRelativeTime={formatRelativeTime}
                 getTypeIcon={getTypeIcon}

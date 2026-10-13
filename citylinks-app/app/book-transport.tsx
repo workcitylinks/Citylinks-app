@@ -7,6 +7,7 @@ import {
   TextInput,
   ActivityIndicator,
   Linking,
+  StyleSheet,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -25,7 +26,6 @@ import {
   Sparkles,
   MoreHorizontal,
 } from 'lucide-react-native';
-import { apiClient } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
 import { useApp } from '../context/AppContext';
 import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
@@ -71,13 +71,6 @@ export default function BookTransportScreen() {
     }
   }, [params.tab, params.mode]);
 
-  useEffect(() => {
-    if (!userToken) {
-      showError('Please sign in to access transport services', 'Sign In Required');
-      router.replace('/auth' as any);
-    }
-  }, [userToken]);
-
   // Hook handles caching, tab switching, and search debouncing
   const { 
     providers, 
@@ -89,6 +82,14 @@ export default function BookTransportScreen() {
 
   const onRefresh = () => {
     refetch({ force: true });
+  };
+
+  const handleGoBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/');
+    }
   };
 
   const handleCallDriver = (provider: TransportProviderItem) => {
@@ -109,7 +110,7 @@ export default function BookTransportScreen() {
           {/* Back to Home Link */}
           <TouchableOpacity
             activeOpacity={0.7}
-            onPress={() => router.back()}
+            onPress={handleGoBack}
             className="flex-row items-center mb-3 self-start py-1"
           >
             <ArrowLeft size={18} color="#1e293b" />
@@ -120,7 +121,7 @@ export default function BookTransportScreen() {
 
           {/* Heading */}
           <View className="flex-row items-center mb-1">
-            <Car size={24} color="#2563eb" className="mr-2" />
+            <Car size={24} color="#2563eb" />
             <Text className="text-2xl font-bold text-slate-900 tracking-tight ml-2">
               Book Transport
             </Text>
@@ -129,24 +130,25 @@ export default function BookTransportScreen() {
             Rides, deliveries & moving services
           </Text>
 
-          {/* Passenger / Commercial Segment Tabs matching attachment */}
-          <View className="flex-row bg-[#f1f5f9] p-1 rounded-2xl mb-2">
+          {/* Passenger / Commercial Segment Tabs */}
+          <View style={styles.segmentContainer}>
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => handleTabChange('passenger')}
-              className={`flex-1 flex-row items-center justify-center py-2.5 rounded-xl ${
-                activeTab === 'passenger' ? 'bg-white shadow-sm' : ''
-              }`}
+              style={[
+                styles.segmentTab,
+                activeTab === 'passenger' && styles.segmentTabActive,
+              ]}
             >
               <Users
                 size={16}
                 color={activeTab === 'passenger' ? '#1e293b' : '#64748b'}
-                className="mr-2"
               />
               <Text
-                className={`text-sm font-semibold ml-1.5 ${
-                  activeTab === 'passenger' ? 'text-slate-900' : 'text-slate-500'
-                }`}
+                style={[
+                  styles.segmentTabText,
+                  activeTab === 'passenger' ? styles.segmentTabTextActive : styles.segmentTabTextInactive,
+                ]}
               >
                 Passenger
               </Text>
@@ -155,19 +157,20 @@ export default function BookTransportScreen() {
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => handleTabChange('commercial')}
-              className={`flex-1 flex-row items-center justify-center py-2.5 rounded-xl ${
-                activeTab === 'commercial' ? 'bg-white shadow-sm' : ''
-              }`}
+              style={[
+                styles.segmentTab,
+                activeTab === 'commercial' && styles.segmentTabActive,
+              ]}
             >
               <Briefcase
                 size={16}
                 color={activeTab === 'commercial' ? '#1e293b' : '#64748b'}
-                className="mr-2"
               />
               <Text
-                className={`text-sm font-semibold ml-1.5 ${
-                  activeTab === 'commercial' ? 'text-slate-900' : 'text-slate-500'
-                }`}
+                style={[
+                  styles.segmentTabText,
+                  activeTab === 'commercial' ? styles.segmentTabTextActive : styles.segmentTabTextInactive,
+                ]}
               >
                 Commercial
               </Text>
@@ -178,23 +181,24 @@ export default function BookTransportScreen() {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            className="-mx-1 py-1 mt-1"
+            contentContainerStyle={styles.horizontalScrollContent}
+            style={styles.horizontalScroll}
           >
             {/* All Vehicles Filter */}
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => setSelectedVehicle('All')}
-              className={`mx-1 px-3.5 py-1.5 rounded-full border flex-row items-center ${
-                selectedVehicle === 'All'
-                  ? 'bg-[#2563eb] border-[#2563eb]'
-                  : 'bg-white border-slate-200'
-              }`}
+              style={[
+                styles.chipButton,
+                selectedVehicle === 'All' ? styles.chipButtonActive : styles.chipButtonInactive,
+              ]}
             >
               <Sparkles size={12} color={selectedVehicle === 'All' ? '#ffffff' : '#64748b'} />
               <Text
-                className={`text-xs font-semibold ml-1.5 ${
-                  selectedVehicle === 'All' ? 'text-white' : 'text-slate-700'
-                }`}
+                style={[
+                  styles.chipText,
+                  selectedVehicle === 'All' ? styles.chipTextActive : styles.chipTextInactive,
+                ]}
               >
                 All Vehicles
               </Text>
@@ -209,17 +213,17 @@ export default function BookTransportScreen() {
                   key={cat.id || cat.name}
                   activeOpacity={0.7}
                   onPress={() => setSelectedVehicle(isSelected ? 'All' : cat.name)}
-                  className={`mx-1 px-3.5 py-1.5 rounded-full border flex-row items-center ${
-                    isSelected
-                      ? 'bg-[#2563eb] border-[#2563eb]'
-                      : 'bg-white border-slate-200'
-                  }`}
+                  style={[
+                    styles.chipButton,
+                    isSelected ? styles.chipButtonActive : styles.chipButtonInactive,
+                  ]}
                 >
                   <IconComponent size={12} color={isSelected ? '#ffffff' : '#2563eb'} />
                   <Text
-                    className={`text-xs font-semibold ml-1.5 ${
-                      isSelected ? 'text-white' : 'text-slate-700'
-                    }`}
+                    style={[
+                      styles.chipText,
+                      isSelected ? styles.chipTextActive : styles.chipTextInactive,
+                    ]}
                   >
                     {cat.name}
                   </Text>
@@ -252,15 +256,17 @@ export default function BookTransportScreen() {
                 key={rec.id || rec.name}
                 activeOpacity={0.8}
                 onPress={() => setSelectedVehicle(isSelected ? 'All' : rec.name)}
-                className={`bg-white rounded-2xl p-4 mb-3 shadow-sm border flex-row items-center justify-between ${
-                  isSelected ? 'border-[#2563eb] bg-blue-50/20 ring-2 ring-blue-500/20' : 'border-slate-100'
-                }`}
+                style={[
+                  styles.recCard,
+                  isSelected && styles.recCardActive,
+                ]}
               >
                 <View className="flex-row items-center flex-1 mr-3">
                   <View
-                    className={`w-12 h-12 rounded-2xl items-center justify-center mr-3 ${
-                      isSelected ? 'bg-blue-600' : 'bg-blue-50'
-                    }`}
+                    style={[
+                      styles.recIconContainer,
+                      isSelected ? styles.recIconContainerActive : styles.recIconContainerInactive,
+                    ]}
                   >
                     <IconComponent size={22} color={isSelected ? '#ffffff' : '#2563eb'} />
                   </View>
@@ -376,8 +382,8 @@ export default function BookTransportScreen() {
                   onPress={() => handleCallDriver(p)}
                   className="bg-[#2563eb] flex-row items-center px-4 py-2.5 rounded-xl shadow-sm"
                 >
-                  <Phone size={14} color="#ffffff" className="mr-1.5" />
-                  <Text className="text-white font-semibold text-xs ml-1">
+                  <Phone size={14} color="#ffffff" />
+                  <Text className="text-white font-semibold text-xs ml-1.5">
                     Call
                   </Text>
                 </TouchableOpacity>
@@ -389,3 +395,111 @@ export default function BookTransportScreen() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  segmentContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#f1f5f9',
+    padding: 4,
+    borderRadius: 16,
+    marginBottom: 8,
+  },
+  segmentTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  segmentTabActive: {
+    backgroundColor: '#ffffff',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  segmentTabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+  segmentTabTextActive: {
+    color: '#0f172a',
+  },
+  segmentTabTextInactive: {
+    color: '#64748b',
+  },
+  horizontalScroll: {
+    marginTop: 4,
+  },
+  horizontalScrollContent: {
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
+  chipButton: {
+    marginHorizontal: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  chipButtonActive: {
+    backgroundColor: '#2563eb',
+    borderColor: '#2563eb',
+  },
+  chipButtonInactive: {
+    backgroundColor: '#ffffff',
+    borderColor: '#e2e8f0',
+  },
+  chipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+  chipTextActive: {
+    color: '#ffffff',
+  },
+  chipTextInactive: {
+    color: '#334155',
+  },
+  recCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  recCardActive: {
+    borderColor: '#2563eb',
+    backgroundColor: '#eff6ff',
+    borderWidth: 1.5,
+  },
+  recIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  recIconContainerActive: {
+    backgroundColor: '#2563eb',
+  },
+  recIconContainerInactive: {
+    backgroundColor: '#eff6ff',
+  },
+});
+

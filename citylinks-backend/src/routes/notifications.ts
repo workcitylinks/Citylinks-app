@@ -42,12 +42,22 @@ router.get('/', optionalAuthToken, async (req: AuthenticatedRequest, res) => {
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
+    const isSuperAdmin = userRole === 'SUPER_ADMIN';
+    const ADMIN_ONLY_TYPES = ['admin', 'admin_only', 'admin_alert', 'join_request', 'super_admin', 'dept:SUPER_ADMIN'];
+
     // Notifications visible:
     // 1. Direct to this user (userId)
-    // 2. Broadcast to all (userId == null and department == null or 'ALL')
-    // 3. Broadcast to user's department/role
+    // 2. Broadcast to all citizens (userId == null, excluding admin types and department types)
+    // 3. Broadcast to user's specific department/role (e.g. dept:MERCHANT)
+    // 4. Super Admin alerts (only accessible when userRole is SUPER_ADMIN)
     const targetConditions: any[] = [
-      { userId: null, type: { not: { startsWith: 'dept:' } } },
+      {
+        userId: null,
+        AND: [
+          { type: { not: { startsWith: 'dept:' } } },
+          { type: { notIn: ADMIN_ONLY_TYPES } },
+        ],
+      },
       { userId: null, type: 'dept:ALL' },
     ];
 
@@ -55,8 +65,19 @@ router.get('/', optionalAuthToken, async (req: AuthenticatedRequest, res) => {
       targetConditions.push({ userId });
     }
 
-    if (userRole) {
+    if (userRole && !isSuperAdmin) {
       targetConditions.push({ userId: null, type: `dept:${userRole}` });
+    }
+
+    if (isSuperAdmin) {
+      targetConditions.push(
+        { userId: null, type: 'admin' },
+        { userId: null, type: 'admin_only' },
+        { userId: null, type: 'admin_alert' },
+        { userId: null, type: 'join_request' },
+        { userId: null, type: 'super_admin' },
+        { userId: null, type: 'dept:SUPER_ADMIN' }
+      );
     }
 
     const notifications = await prisma.notification.findMany({
@@ -115,8 +136,17 @@ router.get('/unread-count', optionalAuthToken, async (req: AuthenticatedRequest,
     const now = new Date();
     const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
+    const isSuperAdmin = userRole === 'SUPER_ADMIN';
+    const ADMIN_ONLY_TYPES = ['admin', 'admin_only', 'admin_alert', 'join_request', 'super_admin', 'dept:SUPER_ADMIN'];
+
     const targetConditions: any[] = [
-      { userId: null, type: { not: { startsWith: 'dept:' } } },
+      {
+        userId: null,
+        AND: [
+          { type: { not: { startsWith: 'dept:' } } },
+          { type: { notIn: ADMIN_ONLY_TYPES } },
+        ],
+      },
       { userId: null, type: 'dept:ALL' },
     ];
 
@@ -124,8 +154,19 @@ router.get('/unread-count', optionalAuthToken, async (req: AuthenticatedRequest,
       targetConditions.push({ userId });
     }
 
-    if (userRole) {
+    if (userRole && !isSuperAdmin) {
       targetConditions.push({ userId: null, type: `dept:${userRole}` });
+    }
+
+    if (isSuperAdmin) {
+      targetConditions.push(
+        { userId: null, type: 'admin' },
+        { userId: null, type: 'admin_only' },
+        { userId: null, type: 'admin_alert' },
+        { userId: null, type: 'join_request' },
+        { userId: null, type: 'super_admin' },
+        { userId: null, type: 'dept:SUPER_ADMIN' }
+      );
     }
 
     const count = await prisma.notification.count({

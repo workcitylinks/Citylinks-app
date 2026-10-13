@@ -60,7 +60,10 @@ function RootContent() {
         <Stack.Screen name="admin-analytics" options={{ title: 'GUI Analyser' }} />
         <Stack.Screen name="admin-notification" options={{ title: 'Broadcast Notification' }} />
         <Stack.Screen name="admin-sponsored" options={{ title: 'Sponsored Listings' }} />
+        <Stack.Screen name="admin-deals" options={{ title: 'Deals & Offers Manager' }} />
         <Stack.Screen name="merchant-dashboard" options={{ title: 'Shop Keeper Console' }} />
+        <Stack.Screen name="manual-service-dashboard" options={{ title: 'Manual Service Console' }} />
+        <Stack.Screen name="digital-service-dashboard" options={{ title: 'Digital Specialist Console' }} />
         <Stack.Screen name="received-orders" options={{ title: 'Received Orders' }} />
       </Stack>
 

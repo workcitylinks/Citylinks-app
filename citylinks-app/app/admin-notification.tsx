@@ -32,6 +32,7 @@ import {
 } from 'lucide-react-native';
 import { apiClient } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
+import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
 
 interface DepartmentOption {
   id: string;
@@ -60,12 +61,20 @@ const DEPARTMENTS: DepartmentOption[] = [
     icon: Store,
   },
   {
-    id: 'LABOR',
-    label: 'Service Providers',
-    description: 'Digital service providers & technicians',
+    id: 'MANUAL_SERVICE_PROVIDER',
+    label: 'Manual Service Providers',
+    description: 'Technicians, mechanics, electricians & repair trades',
     color: '#16a34a',
     bg: '#f0fdf4',
     icon: Wrench,
+  },
+  {
+    id: 'DIGITAL_SERVICE_PROVIDER',
+    label: 'Digital Service Providers',
+    description: 'Designers, developers, digital media & tech experts',
+    color: '#8b5cf6',
+    bg: '#f5f3ff',
+    icon: Sparkles,
   },
   {
     id: 'TRANSPORT',
@@ -111,6 +120,14 @@ export default function AdminNotificationScreen() {
   const [isCustomMode, setIsCustomMode] = useState(false);
   const [sending, setSending] = useState(false);
   const [showDeptDropdown, setShowDeptDropdown] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 400);
+  };
 
   const activeDepartment =
     DEPARTMENTS.find((d) => d.id === selectedDept) || DEPARTMENTS[0];
@@ -242,6 +259,9 @@ export default function AdminNotificationScreen() {
           contentContainerStyle={{ padding: 18, paddingBottom: 60 }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
         >
           {/* Informational Banner */}
           <View

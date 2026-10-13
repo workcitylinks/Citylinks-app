@@ -7,9 +7,10 @@ import {
   TextInput,
   ActivityIndicator,
   Linking,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import {
   ArrowLeft,
   Wrench,
@@ -18,12 +19,128 @@ import {
   MapPin,
   X,
   CheckCircle,
+  Maximize2,
 } from 'lucide-react-native';
 import { apiClient } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
 import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
 import { useApp } from '../context/AppContext';
 import { useServices, ServiceItem } from '../queries/marketplaceQueries';
+import { ImageEnlargeModal } from '../components/ui/ImageEnlargeModal';
+import { getManualServiceCoverImage, DEMO_MANUAL_SERVICE_FALLBACK } from '../utils/serviceImages';
+
+// Redesigned Service Card with guaranteed image loading and graceful demo fallback
+const ServiceCard = ({
+  svc,
+  onEnlarge,
+  onCall,
+}: {
+  svc: ServiceItem;
+  onEnlarge: (data: { url: string; title: string; subtitle: string; badge: string; price: string }) => void;
+  onCall: (phone: string | null, providerName: string) => void;
+}) => {
+  const initialCover = getManualServiceCoverImage(svc);
+  const [imgUri, setImgUri] = useState(initialCover);
+
+  useEffect(() => {
+    setImgUri(getManualServiceCoverImage(svc));
+  }, [svc.imageUrl, svc.category, svc.title]);
+
+  return (
+    <View className="bg-white rounded-3xl mb-4.5 shadow-sm border border-slate-200/90 overflow-hidden">
+      {/* Visual Image Preview with Tap to Enlarge */}
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={() =>
+          onEnlarge({
+            url: imgUri,
+            title: svc.title,
+            subtitle: `By ${svc.providerName} • ${svc.location || 'Haveri Region'}`,
+            badge: svc.category,
+            price: svc.priceLabel,
+          })
+        }
+        className="relative w-full h-[155px] bg-slate-100"
+      >
+        <Image
+          source={{ uri: imgUri }}
+          onError={() => setImgUri(DEMO_MANUAL_SERVICE_FALLBACK)}
+          style={{ width: '100%', height: '100%' }}
+          resizeMode="cover"
+        />
+
+        {/* Top-Left Category Badge */}
+        <View className="absolute top-3 left-3 bg-[#2563eb] px-3 py-1 rounded-full shadow-sm flex-row items-center border border-white/20">
+          <Text className="text-[11px] font-extrabold text-white uppercase tracking-wider">
+            {svc.category}
+          </Text>
+        </View>
+
+        {/* Top-Right Tap to Enlarge Badge */}
+        <View className="absolute top-3 right-3 bg-black/65 px-2.5 py-1 rounded-full flex-row items-center gap-1.5 border border-white/25">
+          <Maximize2 size={11} color="#ffffff" />
+          <Text className="text-[10px] font-bold text-white">Tap to Enlarge</Text>
+        </View>
+
+        {/* Bottom-Right Price Tag Pill */}
+        <View className="absolute bottom-3 right-3 bg-white px-3 py-1.5 rounded-xl shadow-md border border-slate-100/80">
+          <Text className="text-xs font-black text-[#2563eb]">
+            {svc.priceLabel}
+          </Text>
+        </View>
+      </TouchableOpacity>
+
+      {/* Card Content Area */}
+      <View className="p-4">
+        {/* Title */}
+        <Text className="text-base font-extrabold text-slate-900 tracking-tight leading-snug mb-1.5">
+          {svc.title}
+        </Text>
+
+        {/* Provider Details & Live Status */}
+        <View className="flex-row items-center mb-2.5">
+          <CheckCircle size={14} color="#2563eb" />
+          <Text className="text-xs font-semibold text-slate-700 ml-1.5">
+            By {svc.providerName}
+          </Text>
+          <Text className="text-slate-300 mx-2">·</Text>
+          <View className="flex-row items-center bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+            <View className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1" />
+            <Text className="text-[10px] font-extrabold text-emerald-700">Available</Text>
+          </View>
+        </View>
+
+        {/* Scope / Description */}
+        {svc.description ? (
+          <Text className="text-xs text-slate-500 mb-3.5 leading-relaxed" numberOfLines={2}>
+            {svc.description}
+          </Text>
+        ) : null}
+
+        {/* Card Footer */}
+        <View className="flex-row items-center justify-between pt-3 border-t border-slate-100">
+          <View className="flex-row items-center flex-1 mr-2">
+            <MapPin size={13} color="#64748b" />
+            <Text className="text-xs text-slate-500 font-medium ml-1" numberOfLines={1}>
+              {svc.location || 'Haveri Region'}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => onCall(svc.phone, svc.providerName)}
+            className="bg-[#2563eb] flex-row items-center px-4 py-2.5 rounded-xl shadow-sm"
+          >
+            <Phone size={13} color="#ffffff" />
+            <Text className="text-white font-bold text-xs ml-1.5">
+              Book Now
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+};
 
 export default function BookServiceScreen() {
   const { showSuccess, showError } = useToast();
@@ -35,6 +152,13 @@ export default function BookServiceScreen() {
     initialCategoryParam || 'All'
   );
   const [searchQuery, setSearchQuery] = useState('');
+  const [enlargedImage, setEnlargedImage] = useState<{
+    url: string;
+    title: string;
+    subtitle: string;
+    badge: string;
+    price: string;
+  } | null>(null);
 
   // Hook handles caching, dynamic categories from DB, and debounced search
   const { services, categories, loading, refreshing, refetch } = useServices(selectedCategory, searchQuery);
@@ -50,6 +174,12 @@ export default function BookServiceScreen() {
       setSelectedCategory(params.filter.trim());
     }
   }, [params.category, params.filter, params.service]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      refetch();
+    }, [])
+  );
 
   const onRefresh = () => {
     refetch({ force: true });
@@ -178,63 +308,27 @@ export default function BookServiceScreen() {
               </View>
             ) : (
               services.map((svc) => (
-                <View
+                <ServiceCard
                   key={svc.id}
-                  className="bg-white rounded-3xl p-5 mb-3.5 shadow-sm border border-slate-100"
-                >
-                  <View className="flex-row items-start justify-between mb-2">
-                    <View className="flex-1 mr-3">
-                      <View className="flex-row items-center mb-1">
-                        <View className="bg-blue-50 px-2.5 py-0.5 rounded-full">
-                          <Text className="text-[11px] font-bold text-[#2563eb]">
-                            {svc.category}
-                          </Text>
-                        </View>
-                      </View>
-                      <Text className="text-base font-bold text-slate-900 tracking-tight mb-1">
-                        {svc.title}
-                      </Text>
-                      <Text className="text-xs text-slate-500 font-medium">
-                        By {svc.providerName}
-                      </Text>
-                    </View>
-
-                    <Text className="text-sm font-extrabold text-[#2563eb]">
-                      {svc.priceLabel}
-                    </Text>
-                  </View>
-
-                  {svc.description && (
-                    <Text className="text-xs text-slate-600 mb-3" numberOfLines={2}>
-                      {svc.description}
-                    </Text>
-                  )}
-
-                  <View className="flex-row items-center justify-between pt-3 border-t border-slate-100">
-                    <View className="flex-row items-center">
-                      <MapPin size={13} color="#64748b" />
-                      <Text className="text-xs text-slate-500 ml-1">
-                        {svc.location}
-                      </Text>
-                    </View>
-
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      onPress={() => handleCall(svc.phone, svc.providerName)}
-                      className="bg-[#2563eb] flex-row items-center px-4 py-2 rounded-xl shadow-sm"
-                    >
-                      <Phone size={14} color="#ffffff" className="mr-1.5" />
-                      <Text className="text-white font-semibold text-xs ml-1">
-                        Book Now
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
+                  svc={svc}
+                  onEnlarge={setEnlargedImage}
+                  onCall={handleCall}
+                />
               ))
             )}
           </ScrollView>
         )}
       </SafeAreaView>
+
+      <ImageEnlargeModal
+        visible={Boolean(enlargedImage)}
+        imageUrl={enlargedImage?.url}
+        title={enlargedImage?.title}
+        subtitle={enlargedImage?.subtitle}
+        badge={enlargedImage?.badge}
+        price={enlargedImage?.price}
+        onClose={() => setEnlargedImage(null)}
+      />
     </View>
   );
 }

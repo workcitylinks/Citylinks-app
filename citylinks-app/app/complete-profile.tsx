@@ -13,12 +13,18 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Location from 'expo-location';
 import {
   User,
   CreditCard,
   ShieldCheck,
   CheckCircle2,
   ArrowRight,
+  MapPin,
+  Crosshair,
+  Navigation,
+  X,
+  Sparkles,
 } from 'lucide-react-native';
 import { apiClient } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
@@ -43,6 +49,79 @@ export default function CompleteProfileScreen() {
   const [panNumber, setPanNumber] = useState('');
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [fetchingLocation, setFetchingLocation] = useState(false);
+
+  // Auto GPS Location Fetcher
+  const handleAutoFetchLocation = async () => {
+    try {
+      setFetchingLocation(true);
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        showError(
+          'Permission to access device location was denied. Please allow location access in your device settings or type your address manually.',
+          'Location Permission Needed'
+        );
+        return;
+      }
+
+      const currentLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const [reverseGeocode] = await Location.reverseGeocodeAsync({
+        latitude: currentLocation.coords.latitude,
+        longitude: currentLocation.coords.longitude,
+      });
+
+      if (reverseGeocode) {
+        const parts = [
+          reverseGeocode.name || reverseGeocode.streetNumber,
+          reverseGeocode.street,
+          reverseGeocode.district || reverseGeocode.subregion,
+          reverseGeocode.city,
+          reverseGeocode.region || 'Karnataka',
+          reverseGeocode.postalCode,
+        ].filter(Boolean);
+
+        const fullAddr = parts.join(', ');
+        const locality =
+          reverseGeocode.district ||
+          reverseGeocode.city ||
+          reverseGeocode.subregion ||
+          'Haveri';
+        setAddress(fullAddr || `${locality}, Haveri, Karnataka`);
+        showSuccess(`Auto-detected: ${locality}`, 'Location Fetched');
+      } else {
+        showError(
+          'Could not decode device coordinates into a street address. Please enter manually.',
+          'Geocoding Error'
+        );
+      }
+    } catch (err: any) {
+      console.error('GPS error in complete-profile:', err);
+      showError(
+        err.message || 'Unable to retrieve your current location. Please enter your address manually.',
+        'GPS Error'
+      );
+    } finally {
+      setFetchingLocation(false);
+    }
+  };
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const stored = await AsyncStorage.getItem('user_data');
+        if (stored) {
+          const u = JSON.parse(stored);
+          if (!firstName && u.firstName) setFirstName(u.firstName);
+          if (!lastName && u.lastName) setLastName(u.lastName);
+          if (!phone && u.phone) setPhone(u.phone);
+          if (!address && u.address) setAddress(u.address);
+        }
+      } catch (e) {}
+    })();
+  }, []);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -53,6 +132,7 @@ export default function CompleteProfileScreen() {
         if (u.firstName) setFirstName(u.firstName);
         if (u.lastName) setLastName(u.lastName);
         if (u.phone) setPhone(u.phone);
+        if (u.address) setAddress(u.address);
       }
     } catch (e) {
       console.log('Error refreshing complete-profile:', e);
@@ -231,19 +311,105 @@ export default function CompleteProfileScreen() {
               </View>
             </View>
 
-            {/* Address */}
+            {/* Address with Auto GPS Fetching and Manual Entry */}
             <View>
-              <Text className="text-xs font-semibold text-slate-700 mb-1.5">
-                Address
+              <View className="flex-row items-center justify-between mb-2">
+                <View className="flex-row items-center">
+                  <MapPin size={15} color="#2563eb" />
+                  <Text className="text-xs font-bold text-slate-800 ml-1.5 uppercase tracking-wider">
+                    Doorstep Address / Location
+                  </Text>
+                </View>
+
+                {/* Auto Fetch Location Button */}
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  disabled={fetchingLocation}
+                  onPress={handleAutoFetchLocation}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: '#eff6ff',
+                    paddingHorizontal: 10,
+                    paddingVertical: 5.5,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: '#bfdbfe',
+                  }}
+                >
+                  {fetchingLocation ? (
+                    <ActivityIndicator size="small" color="#2563eb" style={{ marginRight: 5 }} />
+                  ) : (
+                    <Crosshair size={13} color="#2563eb" strokeWidth={2.5} style={{ marginRight: 5 }} />
+                  )}
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#1d4ed8' }}>
+                    {fetchingLocation ? 'Locating GPS...' : 'Auto Fetch Location'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text className="text-[11px] text-slate-400 mb-2 leading-4">
+                Tap 'Auto Fetch Location' to detect via GPS, or enter your doorstep street, locality and city manually below.
               </Text>
-              <TextInput
-                placeholder="Enter your city / doorstep address"
-                multiline
-                numberOfLines={2}
-                value={address}
-                onChangeText={setAddress}
-                className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-slate-800 text-sm"
-              />
+
+              {/* Manual Address Input Box */}
+              <View className="bg-slate-50 border border-slate-200 rounded-2xl p-3 flex-row items-start focus:border-blue-500">
+                <MapPin size={17} color="#64748b" style={{ marginTop: 2, marginRight: 8 }} />
+                <TextInput
+                  placeholder="Enter house/flat no., street, landmark, city (e.g. Haveri Town, Karnataka)"
+                  placeholderTextColor="#94a3b8"
+                  multiline
+                  numberOfLines={2}
+                  value={address}
+                  onChangeText={setAddress}
+                  className="flex-1 text-slate-800 text-sm p-0 leading-5"
+                  style={{ minHeight: 48, textAlignVertical: 'top' }}
+                />
+                {Boolean(address) && (
+                  <TouchableOpacity
+                    onPress={() => setAddress('')}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: 11,
+                      backgroundColor: '#e2e8f0',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginLeft: 4,
+                    }}
+                  >
+                    <X size={13} color="#475569" />
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Quick Locality Suggestions for Haveri Region */}
+              <View className="mt-2.5">
+                <Text className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Quick Select Area (Haveri District)
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
+                  {['Haveri Town', 'Ranebennur', 'Byadgi', 'Shiggaon', 'Hangal', 'Hirekerur'].map((loc) => (
+                    <TouchableOpacity
+                      key={loc}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        if (!address.trim()) {
+                          setAddress(`${loc}, Haveri, Karnataka`);
+                        } else if (!address.includes(loc)) {
+                          setAddress(`${address}, ${loc}`);
+                        }
+                      }}
+                      className="bg-white border border-slate-200 px-2.5 py-1 rounded-lg mr-1.5 shadow-2xs"
+                    >
+                      <Text className="text-[11px] font-semibold text-slate-600">
+                        + {loc}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
             </View>
           </View>
 

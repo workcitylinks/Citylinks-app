@@ -43,6 +43,7 @@ import {
   ShieldCheck,
   Check,
   Navigation,
+  Maximize2,
 } from "lucide-react-native";
 import { router, useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -54,6 +55,8 @@ import { AppRefreshControl } from "../components/ui/RefreshableScrollView";
 import { useUserLocation } from "../hooks/useUserLocation";
 import { computeShopDistance } from "../utils/distance";
 import { getShopCoverImage } from "./shop-detail";
+import { ImageEnlargeModal } from "../components/ui/ImageEnlargeModal";
+import { getManualServiceCoverImage } from "../utils/serviceImages";
 
 // Removed unused interfaces
 
@@ -133,6 +136,13 @@ export default function Index() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [enlargedImage, setEnlargedImage] = useState<{
+    url: string;
+    title: string;
+    subtitle: string;
+    badge?: string;
+    price?: string;
+  } | null>(null);
 
   // Pagination for Featured (4 at a time) and Popular near you (4 at a time)
   const [featuredPage, setFeaturedPage] = useState(1);
@@ -279,8 +289,11 @@ export default function Index() {
         return "Developer";
       case "MERCHANT":
         return "Merchant";
+      case "MANUAL_SERVICE_PROVIDER":
       case "LABOR":
-        return "Worker";
+        return "Manual Service Provider";
+      case "DIGITAL_SERVICE_PROVIDER":
+        return "Digital Service Provider";
       case "TRANSPORT":
         return "Transport";
       case "CUSTOMER":
@@ -1423,52 +1436,83 @@ export default function Index() {
                     </View>
                   ) : (
                     currentFeatured.map((service) => {
-                    const isTopRated = (service.rating && service.rating >= 4.85);
+                      const isTopRated = (service.rating && service.rating >= 4.85);
+                      const coverUrl = getManualServiceCoverImage({
+                        category: service.category || service.tag,
+                        title: service.title || service.name,
+                      });
 
-                    return (
-                      <TouchableOpacity
-                        key={service.id}
-                        activeOpacity={0.85}
-                        onPress={() =>
-                          router.push({
-                            pathname: '/services',
-                            params: {
-                              category: service.category || service.tag,
-                              service: service.title || service.name,
-                            },
-                          } as any)
-                        }
-                        className="bg-white rounded-2xl p-5 shadow-sm border border-[#e2e8f0]"
-                      >
-                        <View className="flex-row items-start justify-between mb-2.5">
-                          <View className="w-11 h-11 rounded-xl bg-blue-50 items-center justify-center">
-                            <Text className="text-2xl">{service.emoji || '✨'}</Text>
+                      return (
+                        <TouchableOpacity
+                          key={service.id}
+                          activeOpacity={0.85}
+                          onPress={() =>
+                            router.push({
+                              pathname: '/services',
+                              params: {
+                                category: service.category || service.tag,
+                                service: service.title || service.name,
+                              },
+                            } as any)
+                          }
+                          className="bg-white rounded-2xl p-4 shadow-sm border border-[#e2e8f0]"
+                        >
+                          {/* Service Cover Photo with Tap to Enlarge */}
+                          <TouchableOpacity
+                            activeOpacity={0.9}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              setEnlargedImage({
+                                url: coverUrl,
+                                title: service.title || service.name,
+                                subtitle: `By ${service.providerName || service.provider}${service.location ? ` • ${service.location}` : ''}`,
+                                badge: service.category || service.tag || 'Service',
+                                price: service.priceLabel || service.price || '',
+                              });
+                            }}
+                            className="relative rounded-xl overflow-hidden mb-3 border border-slate-200/80"
+                          >
+                            <Image
+                              source={{ uri: coverUrl }}
+                              style={{ width: '100%', height: 115 }}
+                              resizeMode="cover"
+                            />
+                            <View className="absolute top-2 right-2 bg-black/60 px-2 py-0.5 rounded-full flex-row items-center gap-1 border border-white/20">
+                              <Maximize2 size={10} color="#ffffff" />
+                              <Text className="text-[10px] font-bold text-white">Tap to Enlarge</Text>
+                            </View>
+                            <View className="absolute bottom-2 left-2 bg-blue-600/90 px-2 py-0.5 rounded-full">
+                              <Text className="text-[10px] font-bold text-white">{service.category || service.tag}</Text>
+                            </View>
+                          </TouchableOpacity>
+
+                          <View className="flex-row items-start justify-between mb-1.5">
+                            <View className="flex-1 mr-2">
+                              <Text className="font-bold text-base text-slate-900" numberOfLines={1}>
+                                {service.title || service.name}
+                              </Text>
+                              <Text className="text-xs text-slate-500 mt-0.5">
+                                {service.providerName || service.provider}
+                                {service.location ? ` · ${service.location}` : ''}
+                              </Text>
+                            </View>
+                            <Text className="text-primary font-bold text-base">
+                              {service.priceLabel || service.price}
+                            </Text>
                           </View>
-                          <View className="flex-row items-center gap-1.5">
-                            <View className="bg-[#f1f5f9] px-2.5 py-1 rounded-full">
-                              <Text className="text-xs font-medium text-slate-700">{service.category || service.tag}</Text>
+
+                          <View className="flex-row items-center justify-between pt-2.5 mt-1 border-t border-slate-100">
+                            <View className="flex-row items-center">
+                              <Text className="text-xs text-slate-500">Verified Professional</Text>
+                            </View>
+                            <View className="flex-row items-center">
+                              <Text className="text-xs font-bold text-primary mr-1">Book / View</Text>
+                              <ArrowRight size={14} color="#2563eb" />
                             </View>
                           </View>
-                        </View>
-
-                        <Text className="font-bold text-lg text-slate-900 mb-1">{service.title || service.name}</Text>
-                        <Text className="text-sm text-slate-500 mb-3.5">
-                          {service.providerName || service.provider}
-                          {service.location ? ` · ${service.location}` : ''}
-                        </Text>
-
-                        <View className="flex-row items-center justify-between pt-2.5 border-t border-slate-100">
-                          <View className="flex-row items-center">
-                            <Text className="text-primary font-bold text-base">{service.priceLabel || service.price}</Text>
-                          </View>
-                          <View className="flex-row items-center">
-                            <Text className="text-xs font-bold text-primary mr-1">Book / View</Text>
-                            <ArrowRight size={14} color="#2563eb" />
-                          </View>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })
+                        </TouchableOpacity>
+                      );
+                    })
                 )}
                 </View>
 
@@ -1605,12 +1649,29 @@ export default function Index() {
                           >
                             {/* Top Row: Shop Photo Thumbnail + Info Details */}
                             <View className="flex-row items-start">
-                              {/* Photo Thumbnail */}
-                              <Image
-                                source={{ uri: shopCover }}
-                                className="w-16 h-16 rounded-xl bg-slate-100 mr-3 border border-slate-200/70"
-                                resizeMode="cover"
-                              />
+                              {/* Photo Thumbnail with Tap to Enlarge */}
+                              <TouchableOpacity
+                                activeOpacity={0.85}
+                                onPress={(e) => {
+                                  e.stopPropagation();
+                                  setEnlargedImage({
+                                    url: shopCover,
+                                    title: shopName,
+                                    subtitle: shopAddress || '',
+                                    badge: shopCategory,
+                                  });
+                                }}
+                                className="relative mr-3"
+                              >
+                                <Image
+                                  source={{ uri: shopCover }}
+                                  className="w-16 h-16 rounded-xl bg-slate-100 border border-slate-200/70"
+                                  resizeMode="cover"
+                                />
+                                <View className="absolute bottom-1 right-1 bg-black/60 p-1 rounded-md">
+                                  <Maximize2 size={9} color="#ffffff" />
+                                </View>
+                              </TouchableOpacity>
 
                               {/* Main Details */}
                               <View className="flex-1 pr-1">
@@ -1753,6 +1814,16 @@ export default function Index() {
 
         </ScrollView>
       </SafeAreaView>
+
+      <ImageEnlargeModal
+        visible={Boolean(enlargedImage)}
+        imageUrl={enlargedImage?.url}
+        title={enlargedImage?.title}
+        subtitle={enlargedImage?.subtitle}
+        badge={enlargedImage?.badge}
+        price={enlargedImage?.price}
+        onClose={() => setEnlargedImage(null)}
+      />
     </View>
   );
 }

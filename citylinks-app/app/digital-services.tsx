@@ -7,9 +7,10 @@ import {
   TextInput,
   ActivityIndicator,
   Linking,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import {
   ArrowLeft,
   Laptop,
@@ -28,16 +29,133 @@ import {
   Sparkles,
   MoreHorizontal,
   Briefcase,
+  Maximize2,
 } from 'lucide-react-native';
 import { useToast } from '../context/ToastContext';
 import { useApp } from '../context/AppContext';
 import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
+import { ImageEnlargeModal } from '../components/ui/ImageEnlargeModal';
+import { getDigitalServiceCoverImage, DEMO_DIGITAL_SERVICE_FALLBACK } from '../utils/serviceImages';
 import {
   useDigitalServices,
   useDigitalProviders,
   DigitalServiceItem,
   DigitalServiceProviderItem,
 } from '../queries/marketplaceQueries';
+
+// Redesigned Digital Specialist Card with guaranteed demo fallback
+const DigitalProviderCard = ({
+  provider,
+  onEnlarge,
+  onCall,
+}: {
+  provider: DigitalServiceProviderItem;
+  onEnlarge: (data: { url: string; title: string; subtitle: string; badge: string; price: string }) => void;
+  onCall: (phone: string | null, name: string) => void;
+}) => {
+  const initialCover = getDigitalServiceCoverImage(provider);
+  const [imgUri, setImgUri] = useState(initialCover);
+
+  useEffect(() => {
+    setImgUri(getDigitalServiceCoverImage(provider));
+  }, [provider.imageUrl, provider.serviceType, provider.name]);
+
+  return (
+    <View className="bg-white rounded-3xl mb-4.5 shadow-sm border border-slate-200/90 overflow-hidden">
+      {/* Visual Image Preview with Tap to Enlarge */}
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={() =>
+          onEnlarge({
+            url: imgUri,
+            title: provider.name,
+            subtitle: `${provider.serviceType} • ${provider.location || 'Haveri Region'}`,
+            badge: provider.badge || 'Verified Specialist',
+            price: provider.priceLabel,
+          })
+        }
+        className="relative w-full h-[155px] bg-slate-100"
+      >
+        <Image
+          source={{ uri: imgUri }}
+          onError={() => setImgUri(DEMO_DIGITAL_SERVICE_FALLBACK)}
+          style={{ width: '100%', height: '100%' }}
+          resizeMode="cover"
+        />
+
+        {/* Top-Left Category Badge */}
+        <View className="absolute top-3 left-3 bg-[#7c3aed] px-3 py-1 rounded-full shadow-sm flex-row items-center border border-white/20">
+          <Text className="text-[11px] font-extrabold text-white uppercase tracking-wider">
+            {provider.serviceType}
+          </Text>
+        </View>
+
+        {/* Top-Right Tap to Enlarge Badge */}
+        <View className="absolute top-3 right-3 bg-black/65 px-2.5 py-1 rounded-full flex-row items-center gap-1.5 border border-white/25">
+          <Maximize2 size={11} color="#ffffff" />
+          <Text className="text-[10px] font-bold text-white">Tap to Enlarge</Text>
+        </View>
+
+        {/* Bottom-Right Price Tag Pill */}
+        <View className="absolute bottom-3 right-3 bg-white px-3 py-1.5 rounded-xl shadow-md border border-slate-100/80">
+          <Text className="text-xs font-black text-[#7c3aed]">
+            {provider.priceLabel}
+          </Text>
+        </View>
+      </TouchableOpacity>
+
+      {/* Card Content Area */}
+      <View className="p-4">
+        {/* Name */}
+        <Text className="text-base font-extrabold text-slate-900 tracking-tight leading-snug mb-1.5">
+          {provider.name}
+        </Text>
+
+        {/* Trust Badge & Live Status */}
+        <View className="flex-row items-center mb-2.5">
+          <View className="bg-purple-50 px-2.5 py-0.5 rounded-full border border-purple-200 mr-2">
+            <Text className="text-[10px] font-bold text-[#7c3aed]">
+              {provider.badge || 'Verified Specialist'}
+            </Text>
+          </View>
+          <Text className="text-slate-300 mx-1">·</Text>
+          <View className="flex-row items-center bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+            <View className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1" />
+            <Text className="text-[10px] font-extrabold text-emerald-700">Available</Text>
+          </View>
+        </View>
+
+        {/* Deliverables / Scope */}
+        {provider.description ? (
+          <Text className="text-xs text-slate-500 mb-3.5 leading-relaxed" numberOfLines={2}>
+            {provider.description}
+          </Text>
+        ) : null}
+
+        {/* Card Footer */}
+        <View className="flex-row items-center justify-between pt-3 border-t border-slate-100">
+          <View className="flex-row items-center flex-1 mr-2">
+            <MapPin size={13} color="#64748b" />
+            <Text className="text-xs text-slate-500 font-medium ml-1" numberOfLines={1}>
+              {provider.location || 'Haveri Region'}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => onCall(provider.phone, provider.name)}
+            className="bg-[#7c3aed] flex-row items-center px-4 py-2.5 rounded-xl shadow-sm"
+          >
+            <Phone size={13} color="#ffffff" />
+            <Text className="text-white font-bold text-xs ml-1.5">
+              Contact Pro
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+};
 
 const ICON_MAP: Record<string, any> = {
   Globe,
@@ -60,6 +178,13 @@ export default function DigitalServicesScreen() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedService, setSelectedService] = useState<string>(initialParam || 'All');
+  const [enlargedImage, setEnlargedImage] = useState<{
+    url: string;
+    title: string;
+    subtitle: string;
+    badge: string;
+    price: string;
+  } | null>(null);
 
   // Update selectedService when navigation params change
   useEffect(() => {
@@ -86,6 +211,13 @@ export default function DigitalServicesScreen() {
     refreshing,
     refetch: refetchProviders,
   } = useDigitalProviders(selectedService, searchQuery);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      refetchServices();
+      refetchProviders();
+    }, [])
+  );
 
   const onRefresh = async () => {
     await Promise.all([
@@ -244,72 +376,27 @@ export default function DigitalServicesScreen() {
               </View>
             ) : (
               providers.map((provider) => (
-                <View
+                <DigitalProviderCard
                   key={provider.id}
-                  className="bg-white rounded-3xl p-5 mb-3.5 shadow-sm border border-slate-100"
-                >
-                  {/* Card Header: Category & Badge on Left, Price cleanly on Right */}
-                  <View className="flex-row items-center justify-between mb-2">
-                    <View className="flex-row items-center flex-wrap flex-1 mr-2">
-                      <View className="bg-blue-50 px-2.5 py-0.5 rounded-full mr-2">
-                        <Text className="text-[11px] font-bold text-[#2563eb]">
-                          {provider.serviceType}
-                        </Text>
-                      </View>
-                      {provider.badge && (
-                        <View className="bg-emerald-50 px-2 py-0.5 rounded-full">
-                          <Text className="text-[10px] font-bold text-emerald-700">
-                            {provider.badge}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-
-                    <Text className="text-sm font-extrabold text-[#2563eb]">
-                      {provider.priceLabel}
-                    </Text>
-                  </View>
-
-                  {/* Specialist Name & Role */}
-                  <Text className="text-base font-bold text-slate-900 tracking-tight mb-1">
-                    {provider.name}
-                  </Text>
-                  <Text className="text-xs text-slate-500 font-medium mb-2">
-                    Digital Service Specialist
-                  </Text>
-
-                  {provider.description && (
-                    <Text className="text-xs text-slate-600 mb-3" numberOfLines={2}>
-                      {provider.description}
-                    </Text>
-                  )}
-
-                  {/* Card Bottom: Location & Rating on Left, Call button on Right */}
-                  <View className="flex-row items-center justify-between pt-3 border-t border-slate-100">
-                    <View className="flex-row items-center flex-wrap flex-1 mr-2">
-                      <View className="flex-row items-center mr-3">
-                        <MapPin size={13} color="#64748b" />
-                        <Text className="text-xs text-slate-500 ml-1 font-medium">
-                          {provider.location}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      onPress={() => handleCall(provider.phone, provider.name)}
-                      className="bg-[#2563eb] flex-row items-center px-4 py-2 rounded-xl shadow-sm"
-                    >
-                      <Phone size={14} color="#ffffff" className="mr-1.5" />
-                      <Text className="text-white text-xs font-bold">Contact / Call</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
+                  provider={provider}
+                  onEnlarge={setEnlargedImage}
+                  onCall={handleCall}
+                />
               ))
             )}
           </ScrollView>
         )}
       </SafeAreaView>
+
+      <ImageEnlargeModal
+        visible={Boolean(enlargedImage)}
+        imageUrl={enlargedImage?.url}
+        title={enlargedImage?.title}
+        subtitle={enlargedImage?.subtitle}
+        badge={enlargedImage?.badge}
+        price={enlargedImage?.price}
+        onClose={() => setEnlargedImage(null)}
+      />
     </View>
   );
 }

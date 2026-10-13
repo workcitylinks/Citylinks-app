@@ -25,7 +25,7 @@ const registerSchema = z.object({
   email: z.string().trim().toLowerCase().email("Invalid email format"),
   password: z.string().trim().min(6, "Password must be at least 6 characters"),
   fullName: z.string().trim().min(1, "Full name is required").optional().or(z.literal('')),
-  role: z.enum(['CUSTOMER', 'MERCHANT', 'LABOR', 'TRANSPORT', 'SUPER_ADMIN', 'DEVELOPER']).optional(),
+  role: z.enum(['CUSTOMER', 'MERCHANT', 'MANUAL_SERVICE_PROVIDER', 'DIGITAL_SERVICE_PROVIDER', 'TRANSPORT', 'SUPER_ADMIN', 'DEVELOPER']).optional(),
 });
 
 const verifySchema = z.object({
@@ -499,7 +499,7 @@ const updateProfileSchema = z.object({
   address: z.string().trim().optional(),
   aadhaarNumber: z.string().trim().optional(),
   panNumber: z.string().trim().optional(),
-  role: z.enum(['CUSTOMER', 'MERCHANT', 'LABOR', 'TRANSPORT', 'SUPER_ADMIN', 'DEVELOPER']).optional(),
+  role: z.enum(['CUSTOMER', 'MERCHANT', 'MANUAL_SERVICE_PROVIDER', 'DIGITAL_SERVICE_PROVIDER', 'TRANSPORT', 'SUPER_ADMIN', 'DEVELOPER']).optional(),
 });
 
 // GET /api/auth/profile - Always return fresh user profile
@@ -539,7 +539,15 @@ router.post('/switch-role', authenticateToken, async (req: any, res) => {
   try {
     const userId = req.user.id;
     const { role } = req.body;
-    const validRoles = ['CUSTOMER', 'MERCHANT', 'LABOR', 'TRANSPORT', 'SUPER_ADMIN', 'DEVELOPER'];
+    const validRoles = [
+      'CUSTOMER',
+      'MERCHANT',
+      'MANUAL_SERVICE_PROVIDER',
+      'DIGITAL_SERVICE_PROVIDER',
+      'TRANSPORT',
+      'SUPER_ADMIN',
+      'DEVELOPER',
+    ];
     if (!role || !validRoles.includes(role.toUpperCase())) {
       return res.status(400).json({ error: 'Invalid role specified' });
     }
