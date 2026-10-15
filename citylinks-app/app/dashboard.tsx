@@ -56,6 +56,8 @@ import {
   Headphones,
   MessageSquare,
   Briefcase,
+  Car,
+  Navigation,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useApp } from '../context/AppContext';
@@ -2206,23 +2208,55 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {isTransport && (
-          <View className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm mb-5">
-            <View className="flex-row items-center mb-3">
-              <Truck size={18} color="#0891b2" />
-              <Text className="text-base font-bold text-slate-900 ml-2">
-                Transport Fleet Dispatch
-              </Text>
+        {isTransport && !isSuperAdmin && (
+          <View className="bg-white rounded-3xl p-5 border border-blue-200 shadow-sm mb-5">
+            <View className="flex-row items-center justify-between mb-3">
+              <View className="flex-row items-center">
+                <View className="w-9 h-9 rounded-xl bg-blue-100 items-center justify-center mr-2.5">
+                  <Truck size={19} color="#2563eb" />
+                </View>
+                <View>
+                  <Text className="text-base font-bold text-slate-900">
+                    Transport Fleet Console
+                  </Text>
+                  <Text className="text-[11px] text-blue-600 font-semibold">
+                    Driver & Fleet Manager (Max 3 Vehicles)
+                  </Text>
+                </View>
+              </View>
             </View>
+
             <Text className="text-xs text-slate-500 leading-relaxed mb-4">
-              Your commercial vehicle or passenger service is listed for quick passenger pickup and freight delivery.
+              Manage your driver registration details, official license, live online status, and register up to 3 vehicles (Car, Auto Rickshaw, Bike Taxi, or Commercial) under your ID.
             </Text>
-            <TouchableOpacity
-              onPress={() => router.push('/book-transport' as any)}
-              className="py-3 rounded-xl bg-cyan-50 border border-cyan-200 items-center"
-            >
-              <Text className="text-xs font-bold text-cyan-700">Open Transport Center</Text>
-            </TouchableOpacity>
+
+            <View className="gap-2.5">
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => router.push('/transport-dashboard' as any)}
+                className="w-full p-3.5 rounded-2xl bg-blue-600 flex-row items-center justify-between shadow-sm shadow-blue-200"
+              >
+                <View className="flex-row items-center flex-1 mr-2">
+                  <View className="w-10 h-10 rounded-xl bg-white/20 items-center justify-center mr-3">
+                    <Car size={20} color="#ffffff" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-sm font-bold text-white">Open Driver Fleet Console</Text>
+                    <Text className="text-[11px] text-blue-100 mt-0.5">Manage up to 3 vehicles, rates & live trips</Text>
+                  </View>
+                </View>
+                <ArrowRight size={17} color="#ffffff" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => router.push('/book-transport' as any)}
+                className="py-3 rounded-xl bg-slate-50 border border-slate-200 items-center justify-center flex-row gap-1.5"
+              >
+                <Navigation size={14} color="#475569" />
+                <Text className="text-xs font-bold text-slate-700">View Public Passenger Map</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 

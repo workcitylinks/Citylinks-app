@@ -90,6 +90,27 @@ setInterval(async () => {
   }
 }, 60 * 60 * 1000);
 
+// Background job: Purge ride messages older than 2 hours every 5 minutes (guarantees DB deletion)
+setInterval(async () => {
+  try {
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    const now = new Date();
+    const msgResult = await prisma.rideMessage.deleteMany({
+      where: {
+        OR: [
+          { expiresAt: { lte: now } },
+          { createdAt: { lt: twoHoursAgo } },
+        ],
+      },
+    });
+    if (msgResult.count > 0) {
+      console.log(`[Cleanup] Permanently deleted ${msgResult.count} expired ride messages (> 2hrs) from database.`);
+    }
+  } catch (err) {
+    console.error("[RideMessage Cleanup Error]:", err);
+  }
+}, 5 * 60 * 1000);
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

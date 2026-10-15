@@ -145,3 +145,9 @@ __pycache__/
 .cursor/
 .devin/
 
+# Service Account Keys & Secrets
+serviceAccountKey.json
+*serviceAccountKey*.json
+*-service-account*.json
+service-account*.json
+

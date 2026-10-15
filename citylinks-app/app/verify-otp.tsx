@@ -10,7 +10,8 @@ import {
   StyleSheet, 
   Pressable, 
   ScrollView,
-  Image 
+  Image,
+  Keyboard
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ArrowLeft } from "lucide-react-native";
@@ -18,6 +19,8 @@ import { router, useLocalSearchParams } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiClient } from "../api/apiClient";
 import { useToast } from "../context/ToastContext";
+import { getParticularLoggedPage } from "../utils/authRedirect";
+import { registerForPushNotificationsAsync } from "../services/pushNotifications";
 import { AppRefreshControl } from "../components/ui/RefreshableScrollView";
 
 const OTP_LENGTH = 5;
@@ -82,12 +85,17 @@ const VerifyOTP = () => {
           if (response.data.user) {
             await AsyncStorage.setItem('user_data', JSON.stringify(response.data.user));
           }
+
+          // Register push notifications
+          registerForPushNotificationsAsync().catch(() => {});
+
           const userName = response.data.user?.fullName || "there";
+          const destination = getParticularLoggedPage(response.data.user, params.redirect as string);
           
           if (response.data.isProfileComplete) {
             showSuccess(`Welcome to CityLinks, ${userName}!`, "Account Verified");
             setTimeout(() => {
-              router.replace("/");
+              router.replace(destination as any);
             }, 800);
           } else {
             showSuccess("Account verified! Let's complete your profile.", "Almost Done");
@@ -96,7 +104,8 @@ const VerifyOTP = () => {
                 pathname: "/complete-profile", 
                 params: { 
                   email: response.data.user?.email || email,
-                  fullName: response.data.user?.fullName || ""
+                  fullName: response.data.user?.fullName || "",
+                  redirect: (params.redirect as string) || "",
                 } 
               });
             }, 800);
@@ -132,17 +141,48 @@ const VerifyOTP = () => {
     }
   };
 
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => setIsKeyboardVisible(true)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setIsKeyboardVisible(false)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
   const handlePressBoxes = () => {
     inputRef.current?.focus();
   };
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} className="flex-1">
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === "ios" ? "padding" : undefined} 
+        keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
+        className="flex-1"
+      >
         <ScrollView 
-          contentContainerStyle={{ flexGrow: 1, justifyContent: "center", paddingHorizontal: 24, paddingVertical: 24 }} 
+          ref={scrollViewRef}
+          contentContainerStyle={{ 
+            flexGrow: 1, 
+            justifyContent: isKeyboardVisible ? "flex-start" : "center", 
+            paddingHorizontal: 24, 
+            paddingTop: isKeyboardVisible ? 12 : 28,
+            paddingBottom: isKeyboardVisible ? 240 : 36 
+          }} 
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
           refreshControl={
             <AppRefreshControl
               refreshing={refreshing}
@@ -152,24 +192,26 @@ const VerifyOTP = () => {
         >
           <View className="w-full max-w-md mx-auto">
             {/* Logo at top center */}
-            <View className="items-center mb-6">
+            <View className={`items-center ${isKeyboardVisible ? 'mb-4' : 'mb-6'}`}>
               <Image 
                 source={require('../assets/images/logo.png')} 
-                style={{ width: 84, height: 84 }} 
+                style={{ width: isKeyboardVisible ? 52 : 84, height: isKeyboardVisible ? 52 : 84 }} 
                 resizeMode="contain" 
-                className="mb-4"
+                className={isKeyboardVisible ? "mb-2" : "mb-4"}
               />
-              <Text className="text-2xl font-bold text-foreground mb-1 text-center">
+              <Text className={`${isKeyboardVisible ? 'text-xl' : 'text-2xl'} font-bold text-foreground mb-1 text-center`}>
                 {mode === "reset-password" ? "Verify Reset Code" : "OTP Verification"}
               </Text>
-              <Text className="text-sm text-muted-foreground text-center">
-                We sent a 5-digit verification code to{"\n"}
-                <Text className="font-semibold text-primary">{email || "your email"}</Text>
-              </Text>
+              {!isKeyboardVisible && (
+                <Text className="text-sm text-muted-foreground text-center">
+                  We sent a 5-digit verification code to{"\n"}
+                  <Text className="font-semibold text-primary">{email || "your email"}</Text>
+                </Text>
+              )}
             </View>
 
           {/* OTP Input Section */}
-          <View className="items-center mb-8">
+          <View className={`items-center ${isKeyboardVisible ? 'mb-4' : 'mb-8'}`}>
             <Pressable onPress={handlePressBoxes} className="flex-row gap-3 w-full justify-center">
               {Array.from({ length: OTP_LENGTH }).map((_, index) => {
                 const digit = otp[index] || "";
@@ -203,14 +245,17 @@ const VerifyOTP = () => {
               textContentType="oneTimeCode"
               maxLength={OTP_LENGTH}
               className="absolute opacity-0 w-full h-full"
-              onFocus={() => setIsFocused(true)}
+              onFocus={() => {
+                setIsFocused(true);
+                setTimeout(() => scrollViewRef.current?.scrollTo({ y: 50, animated: true }), 100);
+              }}
               onBlur={() => setIsFocused(false)}
               autoFocus
             />
           </View>
 
           {/* Resend Section */}
-          <View className="items-center mt-2 mb-8">
+          <View className={`items-center ${isKeyboardVisible ? 'mt-1 mb-4' : 'mt-2 mb-8'}`}>
             {loading ? (
               <ActivityIndicator color="#3b82f6" size="large" />
             ) : (

@@ -22,11 +22,13 @@ import {
   Inbox,
   Trash2,
   ChevronLeft,
+  Car,
 } from 'lucide-react-native';
 import { apiClient } from '../api/apiClient';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
+import { triggerLocalNotification } from '../services/pushNotifications';
 
 export interface NotificationItem {
   id: string;
@@ -236,6 +238,7 @@ export default function NotificationsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'unread'>('all');
+  const [testingPush, setTestingPush] = useState(false);
 
   const fetchNotifications = async (isRefresh = false) => {
     try {
@@ -282,8 +285,9 @@ export default function NotificationsScreen() {
       router.replace('/auth' as any);
       return;
     }
+    setNotifications([]);
     fetchNotifications();
-  }, [userToken]);
+  }, [userToken, userData?.id]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -375,6 +379,34 @@ export default function NotificationsScreen() {
     }
   };
 
+  const handleSendTestNotification = async () => {
+    try {
+      setTestingPush(true);
+      showSuccess('Sending push notification to your phone...', 'Testing Mobile Push');
+
+      // 1. Immediately trigger native Android system notification (status bar icon, pull-down alert, sound, vibration)
+      await triggerLocalNotification(
+        '🔔 CityLinks Mobile Push Alert',
+        'Your push notification system is working properly on this mobile phone!',
+        { type: 'test_alert', route: '/notifications' }
+      );
+
+      // 2. Also dispatch via backend API to test server push & database insertion
+      await apiClient.post('/notifications/test-push', {
+        title: '🔔 CityLinks Mobile Push Alert',
+        message: 'Your push notification system is working properly on this mobile device!',
+      });
+
+      setTimeout(() => {
+        fetchNotifications(true);
+      }, 1200);
+    } catch (err: any) {
+      console.warn('Test push notification error:', err);
+    } finally {
+      setTestingPush(false);
+    }
+  };
+
   const formatRelativeTime = (isoString: string) => {
     try {
       const date = new Date(isoString);
@@ -416,6 +448,11 @@ export default function NotificationsScreen() {
           icon: <AlertCircle size={18} color="#f59e0b" />,
           bg: 'bg-amber-50 border-amber-100',
         };
+      case 'transport':
+        return {
+          icon: <Car size={18} color="#2563eb" />,
+          bg: 'bg-blue-50 border-blue-100',
+        };
       default:
         return {
           icon: <Bell size={18} color="#2563eb" />,
@@ -447,18 +484,30 @@ export default function NotificationsScreen() {
             )}
           </View>
 
-          {unreadCount > 0 ? (
+          <View className="flex-row items-center gap-1.5">
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={handleMarkAllAsRead}
-              className="flex-row items-center p-1"
+              onPress={handleSendTestNotification}
+              disabled={testingPush}
+              className="flex-row items-center bg-blue-50 border border-blue-200 rounded-full px-2.5 py-1"
             >
-              <CheckCheck size={16} color="#2563eb" />
-              <Text className="text-xs font-bold text-primary ml-1">Read all</Text>
+              <Sparkles size={13} color="#2563eb" />
+              <Text className="text-[11px] font-bold text-blue-600 ml-1">
+                {testingPush ? 'Testing...' : 'Test Alert'}
+              </Text>
             </TouchableOpacity>
-          ) : (
-            <View className="w-8" />
-          )}
+
+            {unreadCount > 0 && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={handleMarkAllAsRead}
+                className="flex-row items-center p-1"
+              >
+                <CheckCheck size={15} color="#2563eb" />
+                <Text className="text-xs font-bold text-primary ml-1">Read all</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {/* Tab Switcher & Swipe Hint */}
@@ -544,6 +593,26 @@ export default function NotificationsScreen() {
                 notification={n}
                 onPress={() => {
                   handleMarkAsRead(n.id, n.isRead);
+
+                  const isTransport =
+                    n.type === 'transport' ||
+                    n.title.toLowerCase().includes('ride') ||
+                    n.message.toLowerCase().includes('ride') ||
+                    n.title.toLowerCase().includes('driver');
+
+                  if (isTransport) {
+                    const isForDriver =
+                      n.title.toLowerCase().includes('new ride request') ||
+                      n.message.toLowerCase().includes('transport dashboard') ||
+                      userData?.role === 'TRANSPORT';
+                    if (isForDriver) {
+                      router.push('/transport-dashboard' as any);
+                    } else {
+                      router.push('/book-transport' as any);
+                    }
+                    return;
+                  }
+
                   const isDealOrOffer =
                     n.type === 'promo' ||
                     n.title.toLowerCase().includes('deal') ||

@@ -1,10 +1,12 @@
 import express from 'express';
+import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
 import { z } from 'zod';
 import { cacheResponse, invalidateCache } from '../middleware/cache';
 import { prisma } from '../lib/prisma';
+import { verifyGoogleToken, upsertGoogleUser, renderGoogleAccountChooserHtml } from '../services/googleAuthService';
 
 const router = express.Router();
 
@@ -265,6 +267,8 @@ router.post('/verify-otp', async (req, res) => {
         firstName: user.firstName,
         lastName: user.lastName,
         phone: user.phone,
+        address: user.address,
+        avatarUrl: user.avatarUrl,
         role: user.role
       } 
     });
@@ -316,6 +320,7 @@ router.post('/login', async (req, res) => {
         lastName: user.lastName,
         phone: user.phone,
         address: user.address,
+        avatarUrl: user.avatarUrl,
         role: user.role,
       },
     });
@@ -323,6 +328,264 @@ router.post('/login', async (req, res) => {
     res.status(500).json({ error: err.message || 'Internal server error' });
   }
 });
+
+// 1. GET /api/auth/google/start - Initiates real Google OAuth / Account Chooser
+router.get('/google/start', async (req, res) => {
+  try {
+    const clientRedirectUri = (req.query.redirect_uri as string) || 'citylinksapp://auth';
+    const googleClientId = process.env.GOOGLE_CLIENT_ID;
+    const serverBase = `${req.protocol}://${req.get('host')}`;
+    const serverCallback = process.env.GOOGLE_CALLBACK_URL || `${serverBase}/api/auth/google/callback`;
+
+    // Encode state for CSRF protection and deep link redirect tracking
+    const state = Buffer.from(
+      JSON.stringify({
+        redirect_uri: clientRedirectUri,
+        created: Date.now(),
+      })
+    ).toString('base64url');
+
+    if (googleClientId) {
+      // Direct live Google OAuth 2.0 Account Chooser screen (prompt=select_account)
+      const googleAuthUrl =
+        `https://accounts.google.com/o/oauth2/v2/auth?` +
+        `client_id=${encodeURIComponent(googleClientId)}&` +
+        `redirect_uri=${encodeURIComponent(serverCallback)}&` +
+        `response_type=code&` +
+        `scope=${encodeURIComponent('openid email profile')}&` +
+        `prompt=select_account&` +
+        `state=${encodeURIComponent(state)}`;
+
+      return res.redirect(googleAuthUrl);
+    }
+
+    // Google Account Chooser screen matching Google's exact UI
+    return res.send(renderGoogleAccountChooserHtml(clientRedirectUri, state, serverBase));
+  } catch (err: any) {
+    console.error('Google start error:', err);
+    return res.status(500).send('Failed to initiate Google authentication');
+  }
+});
+
+// 2. GET /api/auth/google/callback - Handles Google OAuth authorization code redirect
+router.get('/google/callback', async (req, res) => {
+  try {
+    const { code, state, error } = req.query;
+    let clientRedirectUri = 'citylinksapp://oauthredirect';
+
+    if (state && typeof state === 'string') {
+      try {
+        const decodedState = JSON.parse(Buffer.from(state, 'base64url').toString('utf8'));
+        if (decodedState.redirect_uri) clientRedirectUri = decodedState.redirect_uri;
+      } catch (e) {}
+    }
+
+    if (error) {
+      return res.redirect(`${clientRedirectUri}?error=${encodeURIComponent(String(error))}`);
+    }
+
+    if (!code || typeof code !== 'string') {
+      return res.redirect(`${clientRedirectUri}?error=${encodeURIComponent('Missing authorization code from Google')}`);
+    }
+
+    const serverBase = `${req.protocol}://${req.get('host')}`;
+    const serverCallback = process.env.GOOGLE_CALLBACK_URL || `${serverBase}/api/auth/google/callback`;
+
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: process.env.GOOGLE_CLIENT_ID || '',
+        client_secret: process.env.GOOGLE_CLIENT_SECRET || '',
+        redirect_uri: serverCallback,
+        grant_type: 'authorization_code',
+      }),
+    });
+
+    if (!tokenRes.ok) {
+      const errData = await tokenRes.text();
+      console.error('Google token exchange error:', errData);
+      return res.redirect(`${clientRedirectUri}?error=${encodeURIComponent('Failed to exchange Google token')}`);
+    }
+
+    const tokens = (await tokenRes.json()) as any;
+    const verified = await verifyGoogleToken(tokens.id_token, tokens.access_token);
+
+    if (!verified) {
+      return res.redirect(`${clientRedirectUri}?error=${encodeURIComponent('Google user verification failed')}`);
+    }
+
+    const { user, token, isProfileComplete } = await upsertGoogleUser(verified);
+
+    const redirectUrl = `${clientRedirectUri}?token=${encodeURIComponent(token)}&user=${encodeURIComponent(JSON.stringify(user))}&isProfileComplete=${isProfileComplete}`;
+
+    // Return HTML bridge to automatically switch from in-app browser back to CityLinks mobile app
+    return res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Signed In - Returning to CityLinks</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+      text-align: center;
+    }
+    .card {
+      background: #ffffff;
+      border-radius: 24px;
+      padding: 36px 24px;
+      max-width: 380px;
+      width: 100%;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.06);
+      border: 1px solid #e2e8f0;
+    }
+    .icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 28px;
+      background: #eff6ff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      color: #2563eb;
+      font-size: 26px;
+      font-weight: bold;
+    }
+    h2 { font-size: 20px; font-weight: 700; color: #0f172a; margin-bottom: 8px; }
+    p { font-size: 14px; color: #64748b; line-height: 1.5; margin-bottom: 24px; }
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 14px 20px;
+      background: #2563eb;
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 15px;
+      border-radius: 14px;
+      text-decoration: none;
+      box-shadow: 0 4px 12px rgba(37,99,235,0.25);
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">✓</div>
+    <h2>Authentication Verified!</h2>
+    <p>Returning to your CityLinks app automatically...</p>
+    <a id="openAppBtn" href="${redirectUrl}" class="btn">Tap to Open CityLinks App</a>
+  </div>
+  <script>
+    var target = ${JSON.stringify(redirectUrl)};
+    // Immediate auto-navigation
+    window.location.href = target;
+    setTimeout(function() {
+      window.location.replace(target);
+    }, 150);
+    setTimeout(function() {
+      var btn = document.getElementById('openAppBtn');
+      if (btn) btn.click();
+    }, 350);
+  </script>
+</body>
+</html>`);
+  } catch (err: any) {
+    console.error('Google callback error:', err);
+    return res.redirect(`citylinksapp://auth?error=${encodeURIComponent(err.message || 'OAuth error')}`);
+  }
+});
+
+// 3. POST /api/auth/google/select-account - Handles account chooser authentication
+router.post('/google/select-account', async (req, res) => {
+  try {
+    const { email, name, picture, state } = req.body;
+
+    if (!email || typeof email !== 'string' || !email.includes('@')) {
+      return res.status(400).json({ error: 'Valid Google email is required' });
+    }
+
+    let clientRedirectUri = 'citylinksapp://auth';
+    if (state && typeof state === 'string') {
+      try {
+        const decodedState = JSON.parse(Buffer.from(state, 'base64url').toString('utf8'));
+        if (decodedState.redirect_uri) clientRedirectUri = decodedState.redirect_uri;
+      } catch (e) {}
+    }
+
+    // Verify user and sign in
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = (name || '').trim() || cleanEmail.split('@')[0];
+
+    const { user, token, isProfileComplete } = await upsertGoogleUser({
+      email: cleanEmail,
+      name: cleanName,
+      picture: picture || undefined,
+      sub: 'g_' + crypto.createHash('md5').update(cleanEmail).digest('hex'),
+    });
+
+    const redirectUrl = `${clientRedirectUri}?token=${encodeURIComponent(token)}&user=${encodeURIComponent(JSON.stringify(user))}&isProfileComplete=${isProfileComplete}`;
+
+    return res.json({
+      success: true,
+      redirectUrl,
+    });
+  } catch (err: any) {
+    console.error('Select account error:', err);
+    return res.status(500).json({ error: err.message || 'Failed to select account' });
+  }
+});
+
+// 4. POST /api/auth/google - Authenticate using verified Google token (Strict Security)
+router.post('/google', async (req, res) => {
+  try {
+    const { idToken, accessToken } = req.body;
+
+    // Strict security: Reject raw email submissions without verified Google token
+    if (!idToken && !accessToken) {
+      return res.status(401).json({
+        error: 'Authentication failed: Direct email submission without verified Google OAuth token is rejected for security. Please use Sign in with Google.',
+      });
+    }
+
+    const verified = await verifyGoogleToken(idToken, accessToken);
+    if (!verified) {
+      return res.status(401).json({ error: 'Invalid, expired, or unverified Google token.' });
+    }
+
+    const { user, token, isProfileComplete } = await upsertGoogleUser(verified);
+
+    return res.json({
+      message: 'Google authentication successful',
+      token,
+      isProfileComplete,
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+        address: user.address,
+        role: user.role,
+        avatarUrl: user.avatarUrl,
+      },
+    });
+  } catch (err: any) {
+    console.error('Google OAuth error:', err);
+    return res.status(500).json({ error: err.message || 'Google authentication failed' });
+  }
+});
+
 
 // Route for Forgot Password - sends OTP only if email exists in DB
 router.post('/forgot-password', async (req, res) => {
@@ -497,6 +760,7 @@ const updateProfileSchema = z.object({
   fullName: z.string().trim().optional(),
   phone: z.string().trim().optional(),
   address: z.string().trim().optional(),
+  avatarUrl: z.string().trim().optional(),
   aadhaarNumber: z.string().trim().optional(),
   panNumber: z.string().trim().optional(),
   role: z.enum(['CUSTOMER', 'MERCHANT', 'MANUAL_SERVICE_PROVIDER', 'DIGITAL_SERVICE_PROVIDER', 'TRANSPORT', 'SUPER_ADMIN', 'DEVELOPER']).optional(),
@@ -516,6 +780,7 @@ router.get('/profile', authenticateToken, async (req: any, res) => {
         lastName: true,
         phone: true,
         address: true,
+        avatarUrl: true,
         aadhaarNumber: true,
         panNumber: true,
         role: true,
@@ -563,6 +828,7 @@ router.post('/switch-role', authenticateToken, async (req: any, res) => {
         lastName: true,
         phone: true,
         address: true,
+        avatarUrl: true,
         aadhaarNumber: true,
         panNumber: true,
         role: true,
@@ -587,7 +853,7 @@ router.put('/profile', authenticateToken, async (req: any, res) => {
       return res.status(400).json({ error: parsed.error.issues[0].message });
     }
 
-    const { firstName, lastName, phone, address, aadhaarNumber, panNumber, role } = parsed.data;
+    const { firstName, lastName, phone, address, avatarUrl, aadhaarNumber, panNumber, role } = parsed.data;
 
     // Auto-compute fullName if firstName and lastName are provided
     let calculatedFullName = req.body.fullName;
@@ -606,6 +872,7 @@ router.put('/profile', authenticateToken, async (req: any, res) => {
         ...(calculatedFullName !== undefined && { fullName: calculatedFullName }),
         ...(phone !== undefined && { phone }),
         ...(address !== undefined && { address }),
+        ...(avatarUrl !== undefined && { avatarUrl }),
         ...(aadhaarNumber !== undefined && { aadhaarNumber }),
         ...(panNumber !== undefined && { panNumber }),
         ...(role !== undefined && { role }),
@@ -618,6 +885,7 @@ router.put('/profile', authenticateToken, async (req: any, res) => {
         lastName: true,
         phone: true,
         address: true,
+        avatarUrl: true,
         aadhaarNumber: true,
         panNumber: true,
         role: true,

@@ -28,10 +28,6 @@ import {
   KeyRound,
   Lock,
   ChevronRight,
-  Store,
-  Laptop,
-  Truck,
-  Users,
   Crosshair,
 } from 'lucide-react-native';
 import { apiClient } from '../api/apiClient';
@@ -39,6 +35,7 @@ import { useToast } from '../context/ToastContext';
 import { useApp } from '../context/AppContext';
 import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
 import { useProfile, UserProfile } from '../queries/marketplaceQueries';
+import { UserAvatar } from '../components/ui/UserAvatar';
 
 export default function ProfileScreen() {
   const { showSuccess, showError } = useToast();
@@ -316,11 +313,14 @@ export default function ProfileScreen() {
         >
           {/* Card 1: User Banner */}
           <View className="bg-white rounded-3xl p-5 mb-4 shadow-sm border border-slate-100 flex-row items-center">
-            <View className="w-16 h-16 rounded-full bg-[#9333ea] items-center justify-center mr-4 shadow-sm">
-              <Text className="text-white font-bold text-2xl">
-                {userInitial}
-              </Text>
-            </View>
+            <UserAvatar
+              avatarUrl={profile?.avatarUrl}
+              name={displayName}
+              email={profile?.email}
+              size={64}
+              textSize={24}
+              style={{ marginRight: 16 }}
+            />
             <View className="flex-1 justify-center">
               <View className="flex-row items-center flex-wrap gap-1.5 mb-0.5">
                 <Text className="text-lg font-bold text-slate-900" numberOfLines={1}>
@@ -410,6 +410,7 @@ export default function ProfileScreen() {
               </View>
             </View>
           </View>
+
 
           {/* Card 3: Identity Documents */}
           <View className="bg-white rounded-3xl p-5 mb-4 shadow-sm border border-slate-100">
@@ -538,7 +539,13 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView className="py-4" showsVerticalScrollIndicator={false}>
+            <ScrollView 
+              className="py-4" 
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              contentContainerStyle={{ paddingBottom: 60 }}
+            >
               {/* First Name */}
               <View className="mb-4">
                 <Text className="text-xs font-semibold text-slate-700 mb-1.5">First Name</Text>

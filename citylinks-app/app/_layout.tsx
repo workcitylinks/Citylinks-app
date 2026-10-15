@@ -1,9 +1,13 @@
-import { Stack } from 'expo-router';
+import { useRouter, Stack } from 'expo-router';
 import { StatusBar, Platform, View, StyleSheet } from 'react-native';
 import React, { useEffect } from 'react';
 import 'react-native-reanimated';
 import { configureReanimatedLogger, ReanimatedLogLevel } from 'react-native-reanimated';
 import './global.css';
+import {
+  registerForPushNotificationsAsync,
+  setupPushNotificationListeners,
+} from '../services/pushNotifications';
 
 // Disable Reanimated strict-mode warning when reading shared values during component render
 configureReanimatedLogger({
@@ -16,17 +20,27 @@ import { AppProvider, useApp } from '../context/AppContext';
 import { NetworkProvider } from '../context/NetworkContext';
 import SplashScreenView from '../components/SplashScreenView';
 import NoInternetModal from '../components/NoInternetModal';
+import { LiveNotificationBanner } from '../components/LiveNotificationBanner';
 
 function RootContent() {
   const { isAppReady } = useApp();
+  const router = useRouter();
 
   useEffect(() => {
+    // Initialize Firebase Cloud Messaging / Expo push notifications
+    registerForPushNotificationsAsync();
+    const cleanupListeners = setupPushNotificationListeners(router);
+
     StatusBar.setBarStyle('dark-content', true);
     if (Platform.OS === 'android') {
       StatusBar.setBackgroundColor('#ffffff', true);
       StatusBar.setTranslucent(true);
     }
-  }, []);
+
+    return () => {
+      cleanupListeners?.();
+    };
+  }, [router]);
 
   return (
     <View style={{ flex: 1, backgroundColor: '#ffffff' }}>
@@ -64,8 +78,14 @@ function RootContent() {
         <Stack.Screen name="merchant-dashboard" options={{ title: 'Shop Keeper Console' }} />
         <Stack.Screen name="manual-service-dashboard" options={{ title: 'Manual Service Console' }} />
         <Stack.Screen name="digital-service-dashboard" options={{ title: 'Digital Specialist Console' }} />
+        <Stack.Screen name="transport-dashboard" options={{ title: 'Transport Fleet Console' }} />
         <Stack.Screen name="received-orders" options={{ title: 'Received Orders' }} />
+        <Stack.Screen name="oauthredirect" options={{ headerShown: false }} />
+        <Stack.Screen name="+not-found" options={{ headerShown: false }} />
       </Stack>
+
+      {/* Real-time Heads-Up Mobile Notification Banner */}
+      <LiveNotificationBanner />
 
       {/* Custom splash screen overlay displayed smoothly during app initialization */}
       {!isAppReady && (

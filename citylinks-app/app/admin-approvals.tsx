@@ -21,6 +21,10 @@ import {
   Check,
   Clock,
   Sparkles,
+  Truck,
+  CreditCard,
+  FileText,
+  Eye,
 } from 'lucide-react-native';
 import { useToast } from '../context/ToastContext';
 import { useJoinRequests, JoinRequestItem } from '../queries/marketplaceQueries';
@@ -301,6 +305,144 @@ export default function AdminApprovalsScreen() {
                       <View className="absolute bottom-2 left-2 bg-black/60 px-2 py-0.5 rounded-md">
                         <Text className="text-[10px] font-bold text-white">Storefront Photo</Text>
                       </View>
+                    </View>
+                  )}
+
+                  {/* Transport Driver & Registered Vehicles Fleet (Super Admin View) */}
+                  {item.role === 'TRANSPORT' && (
+                    <View className="mb-3.5 bg-blue-50/50 rounded-2xl p-3 border border-blue-200">
+                      <View className="flex-row items-center justify-between mb-2">
+                        <View className="flex-row items-center gap-1.5">
+                          <Truck size={14} color="#2563eb" />
+                          <Text className="text-xs font-black text-blue-900 uppercase tracking-wider">
+                            Transport Fleet & KYC Details
+                          </Text>
+                        </View>
+                        <View className="bg-blue-600 px-2 py-0.5 rounded-full">
+                          <Text className="text-[9px] font-black text-white">DRIVER KYC</Text>
+                        </View>
+                      </View>
+
+                      {/* Driving License & Aadhaar info */}
+                      <View className="bg-white rounded-xl p-2.5 border border-blue-100 mb-2.5 space-y-1.5">
+                        {item.drivingLicense ? (
+                          <View className="flex-row items-center justify-between">
+                            <Text className="text-[11px] font-semibold text-slate-500">Driving License:</Text>
+                            <Text className="text-xs font-black text-slate-800 uppercase tracking-wide">
+                              {item.drivingLicense}
+                            </Text>
+                          </View>
+                        ) : null}
+
+                        {item.aadhaarNumber ? (
+                          <View className="flex-row items-center justify-between">
+                            <Text className="text-[11px] font-semibold text-slate-500">Aadhaar Card:</Text>
+                            <Text className="text-xs font-black text-slate-800">
+                              {item.aadhaarNumber}
+                            </Text>
+                          </View>
+                        ) : null}
+
+                        {/* Document Photo Previews if uploaded */}
+                        {(item.drivingLicensePhoto || item.aadhaarPhoto) && (
+                          <View className="flex-row gap-2 pt-2 border-t border-slate-100">
+                            {item.drivingLicensePhoto && (
+                              <View className="flex-1">
+                                <Text className="text-[9px] font-bold text-slate-500 mb-1">DL Photo</Text>
+                                <Image
+                                  source={{ uri: item.drivingLicensePhoto }}
+                                  style={{ width: '100%', height: 70, borderRadius: 8 }}
+                                  resizeMode="cover"
+                                />
+                              </View>
+                            )}
+                            {item.aadhaarPhoto && (
+                              <View className="flex-1">
+                                <Text className="text-[9px] font-bold text-slate-500 mb-1">Aadhaar Photo</Text>
+                                <Image
+                                  source={{ uri: item.aadhaarPhoto }}
+                                  style={{ width: '100%', height: 70, borderRadius: 8 }}
+                                  resizeMode="cover"
+                                />
+                              </View>
+                            )}
+                          </View>
+                        )}
+                      </View>
+
+                      {/* Vehicles Registered */}
+                      <Text className="text-[10px] font-black text-blue-900 uppercase tracking-wider mb-1.5">
+                        Registered Vehicles ({(() => {
+                          try {
+                            const list = item.vehiclesJson ? JSON.parse(item.vehiclesJson) : [];
+                            return Array.isArray(list) && list.length > 0 ? list.length : (item.vehiclePlate ? 1 : 0);
+                          } catch (e) {
+                            return item.vehiclePlate ? 1 : 0;
+                          }
+                        })()}/3 Max)
+                      </Text>
+
+                      {(() => {
+                        let fleet: Array<any> = [];
+                        if (item.vehiclesJson) {
+                          try {
+                            const parsed = JSON.parse(item.vehiclesJson);
+                            if (Array.isArray(parsed) && parsed.length > 0) {
+                              fleet = parsed;
+                            }
+                          } catch (e) { }
+                        }
+                        if (fleet.length === 0 && (item.vehiclePlate || item.vehicleModel)) {
+                          fleet = [{
+                            vehicleType: item.vehicleType || 'Car',
+                            modelName: item.vehicleModel || 'Primary Vehicle',
+                            plateNumber: item.vehiclePlate || 'KA --',
+                            ratePerKm: item.ratePerKm || 20,
+                            baseFare: item.baseFare || 30,
+                            isPrimary: true,
+                          }];
+                        }
+
+                        return fleet.map((v, vIdx) => (
+                          <View
+                            key={vIdx}
+                            className="bg-white rounded-xl p-2.5 mb-1.5 border border-slate-200"
+                          >
+                            <View className="flex-row items-center justify-between mb-1.5">
+                              <View className="flex-1 mr-2">
+                                <View className="flex-row items-center gap-1.5">
+                                  <Text className="text-xs font-black text-slate-900">{v.modelName}</Text>
+                                  {v.isPrimary && (
+                                    <View className="bg-blue-600 px-1.5 py-0.2 rounded">
+                                      <Text className="text-[8px] font-black text-white">PRIMARY</Text>
+                                    </View>
+                                  )}
+                                </View>
+                                <Text className="text-[10px] text-slate-500">{v.vehicleType}</Text>
+                              </View>
+
+                              {/* Commercial Yellow Number Plate */}
+                              <View className="flex-row items-center bg-[#fef08a] border border-[#ca8a04] rounded px-1.5 py-0.5">
+                                <View className="bg-blue-700 px-1 rounded-xs mr-1 items-center justify-center">
+                                  <Text className="text-[7px] font-black text-white">IND</Text>
+                                </View>
+                                <Text className="text-[10px] font-black text-slate-900 uppercase tracking-wider">
+                                  {v.plateNumber}
+                                </Text>
+                              </View>
+                            </View>
+
+                            <View className="flex-row items-center justify-between bg-slate-50 px-2 py-1 rounded-lg">
+                              <Text className="text-[10px] text-slate-600">
+                                Rate: <Text className="font-bold text-blue-700">₹{v.ratePerKm}/km</Text>
+                              </Text>
+                              <Text className="text-[10px] text-slate-600">
+                                Base Fare: <Text className="font-bold text-slate-800">₹{v.baseFare}</Text>
+                              </Text>
+                            </View>
+                          </View>
+                        ));
+                      })()}
                     </View>
                   )}
 

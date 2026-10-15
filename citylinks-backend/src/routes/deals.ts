@@ -1,6 +1,7 @@
 import express from 'express';
 import { cacheResponse, invalidateCache } from '../middleware/cache';
 import { prisma } from '../lib/prisma';
+import { createAndSendNotification } from '../services/notificationService';
 
 const router = express.Router();
 
@@ -157,15 +158,14 @@ router.post('/', async (req, res) => {
           validUntil ? `Valid: ${validUntil.trim()}. ` : ''
         }Check out this special deal in Deals & Offers!`;
 
-        createdNotification = await prisma.notification.create({
-          data: {
-            title: notifTitle,
-            message: notifMessage,
-            type: 'promo',
-            userId: null, // Broadcast to all users
-            isRead: false,
-            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Active for 7 days
-          },
+        createdNotification = await createAndSendNotification({
+          userId: null,
+          title: notifTitle,
+          message: notifMessage,
+          type: 'promo',
+          route: '/deals',
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          data: { dealId: newDeal.id },
         });
         console.log(`[Deals] Broadcasted deal notification: "${notifTitle}"`);
       } catch (notifErr) {

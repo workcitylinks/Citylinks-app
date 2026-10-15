@@ -1,6 +1,7 @@
 import express from 'express';
 import { cacheResponse, invalidateCache } from '../middleware/cache';
 import { prisma } from '../lib/prisma';
+import { createAndSendNotification } from '../services/notificationService';
 
 const router = express.Router();
 
@@ -539,6 +540,16 @@ router.post('/digital-providers', async (req, res) => {
     }
 
     invalidateCache();
+
+    // Broadcast push notification to all citizens
+    createAndSendNotification({
+      userId: null,
+      title: `💻 New Digital Specialist: ${newProvider.name}!`,
+      message: `${newProvider.name} is now offering ${newProvider.serviceType} services. Tap to connect!`,
+      type: 'service',
+      route: '/digital-services',
+      data: { providerId: newProvider.id },
+    }).catch((e) => console.warn('[Push Digital Error]', e));
 
     res.status(201).json({
       success: true,

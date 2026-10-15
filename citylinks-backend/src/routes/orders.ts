@@ -2,6 +2,7 @@ import express from 'express';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
 import { randomUUID } from 'crypto';
+import { createAndSendNotification } from '../services/notificationService';
 
 const router = express.Router();
 
@@ -96,16 +97,41 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res) => {
       console.warn('Could not remove ordered items from cart:', cartErr);
     }
 
-    // Create notification for customer
+    // Create notification & push for customer
     try {
-      await prisma.notification.create({
-        data: {
-          userId,
-          title: '🛍️ Order Confirmed!',
-          message: `Your order #${orderId} with ${shopName || 'the shop'} has been placed via UPI (₹${totalAmount}).`,
-          type: 'order',
-        },
+      await createAndSendNotification({
+        userId,
+        title: '🛍️ Order Confirmed!',
+        message: `Your order #${orderId} with ${shopName || 'the shop'} has been placed via UPI (₹${totalAmount}).`,
+        type: 'order',
+        route: '/orders',
+        data: { orderId },
       });
+
+      // Also notify merchant/shop owner if shop is registered with a user
+      if (shopId) {
+        const targetShop = await prisma.shop.findUnique({ where: { id: shopId } });
+        if (targetShop?.phone || targetShop?.email) {
+          const merchantUser = await prisma.user.findFirst({
+            where: {
+              OR: [
+                ...(targetShop.phone ? [{ phone: targetShop.phone }] : []),
+                ...(targetShop.email ? [{ email: targetShop.email }] : []),
+              ],
+            },
+          });
+          if (merchantUser?.id) {
+            await createAndSendNotification({
+              userId: merchantUser.id,
+              title: '🔔 New Customer Order Received!',
+              message: `New order #${orderId} placed for ₹${totalAmount} at ${targetShop.name}. Tap to view order.`,
+              type: 'order',
+              route: '/received-orders',
+              data: { orderId },
+            });
+          }
+        }
+      }
     } catch (notifErr) {}
 
     return res.status(201).json({
@@ -231,13 +257,13 @@ router.patch('/:id/dispatch', async (req, res) => {
     const order = rows && rows[0];
     if (order && order.userId) {
       try {
-        await prisma.notification.create({
-          data: {
-            userId: order.userId,
-            title: '🚚 Order Dispatched!',
-            message: `Your order #${order.id} from ${order.shopName || 'the shop'} has been dispatched for delivery.`,
-            type: 'order',
-          },
+        await createAndSendNotification({
+          userId: order.userId,
+          title: '🚚 Order Dispatched!',
+          message: `Your order #${order.id} from ${order.shopName || 'the shop'} has been dispatched for delivery.`,
+          type: 'order',
+          route: '/orders',
+          data: { orderId: order.id },
         });
       } catch (e) {}
     }
@@ -366,15 +392,15 @@ router.post('/verify-payment', authenticateToken, async (req: AuthenticatedReque
       console.warn('Could not clear items from cart after payment verification:', cartErr);
     }
 
-    // Create notification
+    // Create notification & push
     try {
-      await prisma.notification.create({
-        data: {
-          userId,
-          title: '✅ Payment Received & Order Confirmed!',
-          message: `Your payment of ₹${totalAmount} via ${upiApp || 'UPI'} was verified. Order #${orderId} is confirmed.`,
-          type: 'order',
-        },
+      await createAndSendNotification({
+        userId,
+        title: '✅ Payment Received & Order Confirmed!',
+        message: `Your payment of ₹${totalAmount} via ${upiApp || 'UPI'} was verified. Order #${orderId} is confirmed.`,
+        type: 'order',
+        route: '/orders',
+        data: { orderId },
       });
     } catch (e) {}
 

@@ -1,6 +1,7 @@
 import express from 'express';
 import { cacheResponse, invalidateCache } from '../middleware/cache';
 import { prisma } from '../lib/prisma';
+import { createAndSendNotification } from '../services/notificationService';
 
 const router = express.Router();
 
@@ -232,6 +233,16 @@ router.post('/', async (req, res) => {
     });
 
     invalidateCache();
+
+    // Broadcast push notification to all citizens
+    createAndSendNotification({
+      userId: null,
+      title: `🛠️ New Service: ${newService.title}!`,
+      message: `${newService.providerName} is now offering ${newService.title} (${newService.category}). Tap to book!`,
+      type: 'service',
+      route: '/services',
+      data: { serviceId: newService.id },
+    }).catch((e) => console.warn('[Push Service Error]', e));
 
     res.status(201).json({
       success: true,

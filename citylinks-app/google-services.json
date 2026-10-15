@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "135616861808",
+    "project_id": "citylinks-2d716",
+    "storage_bucket": "citylinks-2d716.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:135616861808:android:83d4c305ca14892a2fc6b5",
+        "android_client_info": {
+          "package_name": "com.citylinks.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqIzqjpgB3pbi6QjfbhLAwEM9Ne5EGB3M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -28,13 +28,18 @@ import {
 } from 'lucide-react-native';
 import { apiClient } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
+import { useApp } from '../context/AppContext';
 import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
+import { getParticularLoggedPage } from '../utils/authRedirect';
+import { UserAvatar } from '../components/ui/UserAvatar';
 
 export default function CompleteProfileScreen() {
   const { showSuccess, showError } = useToast();
+  const { userData } = useApp();
   const params = useLocalSearchParams();
   const paramEmail = (params.email as string) || '';
   const paramFullName = (params.fullName as string) || '';
+  const paramAvatarUrl = (params.avatarUrl as string) || '';
 
   // Pre-populate first and last names if available from fullName
   const nameParts = paramFullName.trim().split(' ');
@@ -51,58 +56,67 @@ export default function CompleteProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [fetchingLocation, setFetchingLocation] = useState(false);
 
-  // Auto GPS Location Fetcher
-  const handleAutoFetchLocation = async () => {
+  // Auto GPS & Mobile Network Location Fetcher
+  const handleAutoFetchLocation = async (silent = false) => {
     try {
       setFetchingLocation(true);
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        showError(
-          'Permission to access device location was denied. Please allow location access in your device settings or type your address manually.',
-          'Location Permission Needed'
-        );
+        if (!silent) {
+          showError(
+            'Permission to access device location was denied. Please allow location access in your device settings or type your address manually.',
+            'Location Permission Needed'
+          );
+        }
         return;
       }
 
-      const currentLocation = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
+      // 1. Try mobile network / last known position first for instant response
+      let currentLocation = await Location.getLastKnownPositionAsync();
 
-      const [reverseGeocode] = await Location.reverseGeocodeAsync({
-        latitude: currentLocation.coords.latitude,
-        longitude: currentLocation.coords.longitude,
-      });
+      // 2. Fall back to current GPS / network location if no cached position
+      if (!currentLocation) {
+        currentLocation = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+      }
 
-      if (reverseGeocode) {
-        const parts = [
-          reverseGeocode.name || reverseGeocode.streetNumber,
-          reverseGeocode.street,
-          reverseGeocode.district || reverseGeocode.subregion,
-          reverseGeocode.city,
-          reverseGeocode.region || 'Karnataka',
-          reverseGeocode.postalCode,
-        ].filter(Boolean);
+      if (currentLocation?.coords) {
+        const [reverseGeocode] = await Location.reverseGeocodeAsync({
+          latitude: currentLocation.coords.latitude,
+          longitude: currentLocation.coords.longitude,
+        });
 
-        const fullAddr = parts.join(', ');
-        const locality =
-          reverseGeocode.district ||
-          reverseGeocode.city ||
-          reverseGeocode.subregion ||
-          'Haveri';
-        setAddress(fullAddr || `${locality}, Haveri, Karnataka`);
-        showSuccess(`Auto-detected: ${locality}`, 'Location Fetched');
-      } else {
-        showError(
-          'Could not decode device coordinates into a street address. Please enter manually.',
-          'Geocoding Error'
-        );
+        if (reverseGeocode) {
+          const parts = [
+            reverseGeocode.name || reverseGeocode.streetNumber,
+            reverseGeocode.street,
+            reverseGeocode.district || reverseGeocode.subregion,
+            reverseGeocode.city,
+            reverseGeocode.region || 'Karnataka',
+            reverseGeocode.postalCode,
+          ].filter(Boolean);
+
+          const fullAddr = parts.join(', ');
+          const locality =
+            reverseGeocode.district ||
+            reverseGeocode.city ||
+            reverseGeocode.subregion ||
+            'Haveri';
+          setAddress(fullAddr || `${locality}, Haveri, Karnataka`);
+          if (!silent) {
+            showSuccess(`Auto-detected from network: ${locality}`, 'Location Fetched');
+          }
+        }
       }
     } catch (err: any) {
-      console.error('GPS error in complete-profile:', err);
-      showError(
-        err.message || 'Unable to retrieve your current location. Please enter your address manually.',
-        'GPS Error'
-      );
+      console.warn('GPS/Network location error in complete-profile:', err);
+      if (!silent) {
+        showError(
+          err.message || 'Unable to retrieve your current location. Please enter your address manually.',
+          'GPS Error'
+        );
+      }
     } finally {
       setFetchingLocation(false);
     }
@@ -110,6 +124,7 @@ export default function CompleteProfileScreen() {
 
   React.useEffect(() => {
     (async () => {
+      let existingAddress = '';
       try {
         const stored = await AsyncStorage.getItem('user_data');
         if (stored) {
@@ -117,9 +132,17 @@ export default function CompleteProfileScreen() {
           if (!firstName && u.firstName) setFirstName(u.firstName);
           if (!lastName && u.lastName) setLastName(u.lastName);
           if (!phone && u.phone) setPhone(u.phone);
-          if (!address && u.address) setAddress(u.address);
+          if (u.address) {
+            existingAddress = u.address;
+            setAddress(u.address);
+          }
         }
       } catch (e) {}
+
+      // Automatically auto-detect address by default from mobile network / GPS if empty
+      if (!existingAddress) {
+        handleAutoFetchLocation(true);
+      }
     })();
   }, []);
 
@@ -185,14 +208,16 @@ export default function CompleteProfileScreen() {
         lastName: res.data.user.lastName,
         phone: res.data.user.phone,
         address: res.data.user.address,
+        avatarUrl: res.data.user.avatarUrl || parsed.avatarUrl || null,
       };
       await AsyncStorage.setItem('user_data', JSON.stringify(updatedUser));
 
       showSuccess(`Profile setup complete! Welcome, ${res.data.user.fullName || 'there'}!`, 'Welcome to CityLinks');
 
-      // Navigate exclusively to the Main Home page
+      // Navigate to the particular logged page or home
+      const destination = getParticularLoggedPage(updatedUser, params.redirect as string);
       setTimeout(() => {
-        router.replace('/');
+        router.replace(destination as any);
       }, 700);
     } catch (err: any) {
       showError(err.response?.data?.error || 'Failed to complete profile', 'Error');
@@ -205,11 +230,15 @@ export default function CompleteProfileScreen() {
     <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-[#f4f6fc]">
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 12 : 0}
         className="flex-1"
       >
         <ScrollView
-          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 }}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 140 }}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
           refreshControl={
             <AppRefreshControl
               refreshing={refreshing}
@@ -235,11 +264,14 @@ export default function CompleteProfileScreen() {
 
           {/* User Banner Card */}
           <View className="bg-white rounded-3xl p-5 mb-4 shadow-sm border border-slate-100 flex-row items-center">
-            <View className="w-16 h-16 rounded-full bg-[#9333ea] items-center justify-center mr-4 shadow-sm">
-              <Text className="text-white font-bold text-2xl">
-                {userInitial}
-              </Text>
-            </View>
+            <UserAvatar
+              avatarUrl={paramAvatarUrl || userData?.avatarUrl}
+              name={displayName}
+              email={paramEmail}
+              size={64}
+              textSize={24}
+              style={{ marginRight: 16 }}
+            />
             <View className="flex-1 justify-center">
               <Text className="text-lg font-bold text-slate-900" numberOfLines={1}>
                 {displayName}
@@ -317,15 +349,15 @@ export default function CompleteProfileScreen() {
                 <View className="flex-row items-center">
                   <MapPin size={15} color="#2563eb" />
                   <Text className="text-xs font-bold text-slate-800 ml-1.5 uppercase tracking-wider">
-                    Doorstep Address / Location
+                    Doorstep Address
                   </Text>
                 </View>
 
                 {/* Auto Fetch Location Button */}
-                <TouchableOpacity
+                <TouchableOpacity 
                   activeOpacity={0.7}
                   disabled={fetchingLocation}
-                  onPress={handleAutoFetchLocation}
+                  onPress={() => handleAutoFetchLocation(false)}
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',

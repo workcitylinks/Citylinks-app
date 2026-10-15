@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SplashScreen from 'expo-splash-screen';
 import { apiClient } from '../api/apiClient';
+import { registerForPushNotificationsAsync } from '../services/pushNotifications';
 
 // Instantly dismiss Expo Go's default screen so our custom splash shows immediately
 SplashScreen.hideAsync().catch(() => {});
@@ -14,6 +15,7 @@ export interface UserData {
   lastName?: string | null;
   phone?: string | null;
   address?: string | null;
+  avatarUrl?: string | null;
   role?: string;
 }
 
@@ -122,6 +124,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         } catch (apiErr) {
           // offline or token expired
         }
+
+        // Sync push notification token to newly authenticated user profile
+        registerForPushNotificationsAsync().catch(() => {});
       }
 
       await Promise.all([refreshCartCount(), refreshNotificationCount()]);

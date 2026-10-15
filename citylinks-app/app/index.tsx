@@ -57,6 +57,7 @@ import { computeShopDistance } from "../utils/distance";
 import { getShopCoverImage } from "./shop-detail";
 import { ImageEnlargeModal } from "../components/ui/ImageEnlargeModal";
 import { getManualServiceCoverImage } from "../utils/serviceImages";
+import { UserAvatar } from "../components/ui/UserAvatar";
 
 // Removed unused interfaces
 
@@ -375,12 +376,13 @@ export default function Index() {
                   onPress={() => setShowUserMenu(!showUserMenu)}
                   className="flex-row items-center py-1 pl-1"
                 >
-                  {/* Purple Avatar Circle */}
-                  <View className="w-10 h-10 rounded-full bg-[#9333ea] items-center justify-center shadow-sm">
-                    <Text className="text-white font-bold text-base leading-none">
-                      {userInitial}
-                    </Text>
-                  </View>
+                  {/* Avatar Circle: First preference to avatarUrl, fallback to alphabet initial */}
+                  <UserAvatar
+                    avatarUrl={userData?.avatarUrl}
+                    name={userData?.fullName}
+                    email={userData?.email}
+                    size={40}
+                  />
                   <ChevronDown size={18} color="#64748b" className="ml-1" />
                 </TouchableOpacity>
               </View>

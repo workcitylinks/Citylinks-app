@@ -13,6 +13,7 @@ export interface UserProfile {
   lastName: string | null;
   phone: string | null;
   address: string | null;
+  avatarUrl: string | null;
   aadhaarNumber: string | null;
   panNumber: string | null;
   role: string;
@@ -502,6 +503,16 @@ export interface JoinRequestItem {
   phone: string;
   email: string;
   imageUrl?: string | null;
+  drivingLicense?: string | null;
+  drivingLicensePhoto?: string | null;
+  aadhaarNumber?: string | null;
+  aadhaarPhoto?: string | null;
+  vehiclePlate?: string | null;
+  vehicleModel?: string | null;
+  vehicleType?: string | null;
+  ratePerKm?: number | null;
+  baseFare?: number | null;
+  vehiclesJson?: string | null;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   approvedAt?: string | null;
   createdAt: string;

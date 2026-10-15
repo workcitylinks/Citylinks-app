@@ -33,6 +33,7 @@ import { useToast } from '../context/ToastContext';
 import { useApp } from '../context/AppContext';
 import { apiClient } from '../api/apiClient';
 import RefreshableScrollView from '../components/ui/RefreshableScrollView';
+import { UserAvatar } from '../components/ui/UserAvatar';
 import { ImageEnlargerModal } from '../components/ImageEnlargerModal';
 
 export default function OrdersScreen() {
@@ -157,11 +158,12 @@ export default function OrdersScreen() {
             onPress={() => setShowUserMenu(!showUserMenu)}
             className="flex-row items-center"
           >
-            <View className="w-8 h-8 rounded-full bg-[#9333ea] items-center justify-center shadow-xs">
-              <Text className="text-white font-bold text-sm leading-none">
-                {userInitial}
-              </Text>
-            </View>
+            <UserAvatar
+              avatarUrl={userData?.avatarUrl}
+              name={userData?.fullName}
+              email={userData?.email}
+              size={34}
+            />
             <ChevronDown size={16} color="#64748b" className="ml-1" />
           </TouchableOpacity>
         </View>

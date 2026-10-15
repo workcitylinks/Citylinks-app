@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { 
   View, 
   Text, 
@@ -8,7 +8,8 @@ import {
   KeyboardAvoidingView, 
   Platform, 
   ScrollView, 
-  Image 
+  Image,
+  Keyboard
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ArrowLeft, Lock, Eye, EyeOff } from "lucide-react-native";
@@ -29,6 +30,23 @@ const ResetPasswordPage = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => setIsKeyboardVisible(true)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setIsKeyboardVisible(false)
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
@@ -89,13 +107,23 @@ const ResetPasswordPage = () => {
   return (
     <SafeAreaView className="flex-1 bg-background">
       <KeyboardAvoidingView 
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
         className="flex-1"
       >
         <ScrollView 
-          contentContainerStyle={{ flexGrow: 1, justifyContent: "center", paddingHorizontal: 24, paddingVertical: 24 }}
+          ref={scrollViewRef}
+          contentContainerStyle={{ 
+            flexGrow: 1, 
+            justifyContent: isKeyboardVisible ? "flex-start" : "center", 
+            paddingHorizontal: 24, 
+            paddingTop: isKeyboardVisible ? 12 : 28,
+            paddingBottom: isKeyboardVisible ? 260 : 36 
+          }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
           refreshControl={
             <AppRefreshControl
               refreshing={refreshing}
@@ -105,19 +133,21 @@ const ResetPasswordPage = () => {
         >
           <View className="w-full max-w-md mx-auto">
             {/* Logo at Top Center */}
-            <View className="items-center mb-8">
+            <View className={`items-center ${isKeyboardVisible ? 'mb-4' : 'mb-8'}`}>
               <Image 
                 source={require('../assets/images/logo.png')} 
-                style={{ width: 84, height: 84 }} 
+                style={{ width: isKeyboardVisible ? 52 : 84, height: isKeyboardVisible ? 52 : 84 }} 
                 resizeMode="contain" 
-                className="mb-4"
+                className={isKeyboardVisible ? "mb-2" : "mb-4"}
               />
-              <Text className="text-2xl font-bold text-foreground mb-1 text-center">
+              <Text className={`${isKeyboardVisible ? 'text-xl' : 'text-2xl'} font-bold text-foreground mb-1 text-center`}>
                 Create New Password
               </Text>
-              <Text className="text-sm text-muted-foreground text-center">
-                Your identity has been verified. Enter your new password below.
-              </Text>
+              {!isKeyboardVisible && (
+                <Text className="text-sm text-muted-foreground text-center">
+                  Your identity has been verified. Enter your new password below.
+                </Text>
+              )}
             </View>
 
             <View className="space-y-4 gap-y-4">
@@ -133,6 +163,9 @@ const ResetPasswordPage = () => {
                     returnKeyType="next"
                     className="flex-1 ml-2 text-foreground"
                     placeholderTextColor="#64748b"
+                    onFocus={() => {
+                      setTimeout(() => scrollViewRef.current?.scrollTo({ y: 50, animated: true }), 100);
+                    }}
                   />
                   <TouchableOpacity 
                     onPress={() => setShowPassword(!showPassword)} 
@@ -157,6 +190,9 @@ const ResetPasswordPage = () => {
                     onSubmitEditing={handleResetPassword}
                     className="flex-1 ml-2 text-foreground"
                     placeholderTextColor="#64748b"
+                    onFocus={() => {
+                      setTimeout(() => scrollViewRef.current?.scrollTo({ y: 120, animated: true }), 100);
+                    }}
                   />
                   <TouchableOpacity 
                     onPress={() => setShowConfirmPassword(!showConfirmPassword)} 

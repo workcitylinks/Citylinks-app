@@ -17,16 +17,21 @@ model User {
   address       String?
   aadhaarNumber String?
   panNumber     String?
+  googleId      String?
+  avatarUrl     String?
   role          Role      @default(CUSTOMER)
   isVerified    Boolean   @default(false)
   otp           String?
   otpExpiresAt  DateTime?
   cart          Cart?
   notifications Notification[]
+  notificationStates UserNotificationState[]
+  deviceTokens  UserDeviceToken[]
   joinRequests  JoinRequest[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
+
 
 enum Role {
   CUSTOMER
@@ -132,22 +137,66 @@ model Service {
 }
 
 model TransportProvider {
-  id          String   @id @default(uuid())
-  name        String
-  type        String   // passenger or commercial
-  vehicleType String   // Auto Rickshaw, Bike Taxi, Car, Tata Ace, Pickup Truck, Tempo
-  phone       String
-  location    String   @default("Haveri Region")
-  fareLabel   String   // e.g. ₹30–₹150
-  eta         String   @default("5–15 min")
-  rating      Float?   @default(4.7)
-  isAvailable Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String          @id @default(uuid())
+  userId          String?         // Linked CityLinks user ID
+  name            String
+  type            String          // passenger or commercial
+  vehicleType     String          // Auto Rickshaw, Bike Taxi, Car, Tata Ace, Pickup Truck, Tempo
+  phone           String
+  location        String          @default("Haveri Region")
+  fareLabel       String          // e.g. ₹30–₹150
+  eta             String          @default("5–15 min")
+  rating          Float?          @default(4.7)
+  isAvailable     Boolean         @default(true)
+  ratePerKm       Float           @default(20.0) // Rupees per km set by driver
+  baseFare        Float           @default(30.0) // Base minimum fare
+  driverPlate     String?         @default("KA 27 M 4589")
+  driverCar       String?         @default("White Toyota Etios")
+  categoryCode    String          @default("normal") // normal, go, xl, auto, bike
+  latitude        Float?          @default(14.7968)
+  longitude       Float?          @default(75.4010)
+  heading         Float?          @default(45.0) // rotation angle in degrees
+  speed           Float?          @default(25.0) // km/h
+  drivingLicense      String?
+  drivingLicensePhoto String?
+  aadhaarNumber       String?
+  aadhaarPhoto        String?
+  emergencyPhone      String?
+  experienceYears     Int?            @default(1)
+  operatingCities     String?         @default("Haveri Region")
+  vehicles            DriverVehicle[]
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
 
   @@index([type])
   @@index([isAvailable])
   @@index([rating(sort: Desc)])
+  @@index([categoryCode])
+  @@index([userId])
+}
+
+model DriverVehicle {
+  id            String            @id @default(uuid())
+  driverId      String
+  driver        TransportProvider @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  userId        String?
+  vehicleType   String            // Car, Auto Rickshaw, Bike Taxi, Tata Ace, Pickup Truck, Tempo
+  modelName     String            // e.g. White Toyota Corolla, Bajaj RE Auto
+  plateNumber   String            // e.g. KA 27 M 4589
+  rcNumber      String?
+  fuelType      String?           @default("Petrol") // Petrol, Diesel, CNG, Electric
+  seating       Int?              @default(4)
+  ratePerKm     Float             @default(20.0)
+  baseFare      Float             @default(30.0)
+  categoryCode  String            @default("normal") // normal, go, xl, auto, bike, commercial
+  isPrimary     Boolean           @default(false)
+  isActive      Boolean           @default(true)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([driverId])
+  @@index([userId])
+  @@index([isPrimary])
 }
 
 model VehicleCategory {
@@ -158,10 +207,68 @@ model VehicleCategory {
   eta         String
   type        String   // passenger or commercial
   iconName    String   // Car, Bike, Truck
+  ratePerKm   Float    @default(20.0)
+  baseFare    Float    @default(30.0)
+  code        String   @default("normal")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([type])
+}
+
+model RideBooking {
+  id                 String    @id @default(uuid())
+  userId             String?
+  userName           String?
+  userPhone          String?
+  driverId           String?
+  driverName         String?
+  driverPhone        String?
+  driverCar          String?
+  driverPlate        String?
+  driverRating       Float?    @default(4.8)
+  pickupAddress      String
+  pickupLat          Float?
+  pickupLng          Float?
+  destinationAddress String
+  destinationLat     Float?
+  destinationLng     Float?
+  distanceKm         Float
+  ratePerKm          Float
+  baseFare           Float     @default(0)
+  totalFare          Float
+  rideType           String    @default("normal") // normal, go, xl, auto, bike
+  status             String    @default("ACCEPTED") // REQUESTED, ACCEPTED, ONGOING, COMPLETED, CANCELLED
+  otp                String?   @default("4921")
+  paymentMethod      String    @default("CASH")
+  paymentStatus      String    @default("PENDING")
+  rating             Int?
+  feedback           String?
+  messages           RideMessage[]
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([driverId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+}
+
+model RideMessage {
+  id         String       @id @default(uuid())
+  bookingId  String
+  booking    RideBooking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  senderId   String?
+  senderRole String       // PASSENGER or DRIVER
+  senderName String
+  text       String
+  expiresAt  DateTime     // Auto-expires and deleted 2 hours after creation
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@index([bookingId])
+  @@index([expiresAt])
+  @@index([createdAt])
 }
 
 model Deal {
@@ -279,11 +386,40 @@ model Notification {
   expiresAt DateTime? // Custom deletion/expiry time configured by Super Admin (defaults to 24h)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  userStates UserNotificationState[]
 
   @@index([userId])
   @@index([isRead])
   @@index([expiresAt])
   @@index([createdAt(sort: Desc)])
+}
+
+model UserNotificationState {
+  id             String       @id @default(uuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notificationId String
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  isRead         Boolean      @default(true)
+  isDismissed    Boolean      @default(false)
+  readAt         DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([userId, notificationId])
+  @@index([userId])
+  @@index([notificationId])
+}
+
+model UserDeviceToken {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  platform  String   @default("android") // android, ios, web
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model JoinRequest {
@@ -299,10 +435,20 @@ model JoinRequest {
   phone         String
   email         String
   imageUrl      String?   // Optional photo from camera or gallery
-  status        String    @default("PENDING") // PENDING, APPROVED, REJECTED
-  approvedAt    DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  drivingLicense      String?  // For Transport drivers
+  drivingLicensePhoto String?  // Optional photo of DL
+  aadhaarNumber       String?  // Aadhaar card number
+  aadhaarPhoto        String?  // Optional photo of Aadhaar
+  vehiclePlate        String?  // For Transport drivers (primary)
+  vehicleModel        String?  // For Transport drivers (primary)
+  vehicleType         String?  // Car, Bike, Auto, Taxi, Tempo, Truck, Other
+  ratePerKm           Float?   // For Transport drivers (primary)
+  baseFare            Float?   // For Transport drivers (primary)
+  vehiclesJson        String?  // JSON array for up to 3 registered vehicles
+  status              String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  approvedAt          DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   @@index([userId])
   @@index([status])
