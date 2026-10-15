@@ -41,6 +41,7 @@ import { queryCache } from '../utils/queryCache';
 import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
 import { compressBanner } from '../utils/imageCompressor';
 import { LazyImage } from '../components/ui/LazyImage';
+import { uploadImageToCloudflare } from '../services/imageUpload';
 
 export default function AdminDealsScreen() {
   const { showSuccess, showError } = useToast();
@@ -167,9 +168,14 @@ export default function AdminDealsScreen() {
       showError('Merchant / Store name is required', 'Missing Field');
       return;
     }
+    if (!dealImage) {
+      showError('Deal banner photo is compulsory. Please take or select a photo.', 'Photo Compulsory');
+      return;
+    }
 
     try {
       setSubmitting(true);
+      const cloudflareUrl = await uploadImageToCloudflare(dealImage);
       await apiClient.post('/deals', {
         title: dealTitle.trim(),
         discount: dealDiscount.trim(),
@@ -177,7 +183,7 @@ export default function AdminDealsScreen() {
         merchantName: dealMerchant.trim(),
         validUntil: dealValidUntil.trim() || 'Limited time offer',
         linkUrl: dealLinkUrl.trim() || '/deals',
-        imageUrl: dealImage || undefined,
+        imageUrl: cloudflareUrl,
         broadcastNotification: true,
       });
 

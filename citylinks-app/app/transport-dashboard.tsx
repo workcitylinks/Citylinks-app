@@ -57,6 +57,7 @@ import { useToast } from '../context/ToastContext';
 import { apiClient } from '../api/apiClient';
 import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
 import { compressDocument } from '../utils/imageCompressor';
+import { uploadImageToCloudflare } from '../services/imageUpload';
 
 // Vehicle type choices (User specified: Car, Bike, Auto, Taxi, Tempo, Truck, Other)
 const VEHICLE_TYPES = [
@@ -467,6 +468,16 @@ export default function TransportDashboardScreen() {
 
     setSavingProfile(true);
     try {
+      let cloudflareLicense = editLicensePhoto;
+      let cloudflareAadhaar = editAadhaarPhoto;
+
+      if (editLicensePhoto && !editLicensePhoto.startsWith('http')) {
+        cloudflareLicense = await uploadImageToCloudflare(editLicensePhoto);
+      }
+      if (editAadhaarPhoto && !editAadhaarPhoto.startsWith('http')) {
+        cloudflareAadhaar = await uploadImageToCloudflare(editAadhaarPhoto);
+      }
+
       if (!driver?.id) {
         // First-time registration
         const res = await apiClient.post('/transport/driver/register', {
@@ -474,9 +485,9 @@ export default function TransportDashboardScreen() {
           phone: editPhone.trim(),
           location: editLocation.trim(),
           drivingLicense: editLicense.trim(),
-          drivingLicensePhoto: editLicensePhoto,
+          drivingLicensePhoto: cloudflareLicense,
           aadhaarNumber: editAadhaar.trim(),
-          aadhaarPhoto: editAadhaarPhoto,
+          aadhaarPhoto: cloudflareAadhaar,
           emergencyPhone: editEmergency.trim(),
           ratePerKm: parseFloat(editRatePerKm) || 20,
           baseFare: parseFloat(editBaseFare) || 30,
@@ -492,9 +503,9 @@ export default function TransportDashboardScreen() {
           phone: editPhone.trim(),
           location: editLocation.trim(),
           drivingLicense: editLicense.trim(),
-          drivingLicensePhoto: editLicensePhoto,
+          drivingLicensePhoto: cloudflareLicense,
           aadhaarNumber: editAadhaar.trim(),
-          aadhaarPhoto: editAadhaarPhoto,
+          aadhaarPhoto: cloudflareAadhaar,
           emergencyPhone: editEmergency.trim(),
           ratePerKm: parseFloat(editRatePerKm) || 20,
           baseFare: parseFloat(editBaseFare) || 30,

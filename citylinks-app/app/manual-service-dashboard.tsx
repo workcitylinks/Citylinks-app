@@ -54,6 +54,7 @@ import { ImageEnlargeModal } from '../components/ui/ImageEnlargeModal';
 import { getManualServiceCoverImage } from '../utils/serviceImages';
 import { compressBanner } from '../utils/imageCompressor';
 import { LazyImage } from '../components/ui/LazyImage';
+import { uploadImageToCloudflare } from '../services/imageUpload';
 
 export default function ManualServiceDashboardScreen() {
   const { userData } = useApp();
@@ -323,9 +324,14 @@ export default function ManualServiceDashboardScreen() {
       showError('Category is required', 'Missing Category');
       return;
     }
+    if (!serviceImageUrl.trim()) {
+      showError('Service banner photo is compulsory. Please capture or select an image.', 'Photo Compulsory');
+      return;
+    }
 
     try {
       setAddingService(true);
+      const cloudflareUrl = await uploadImageToCloudflare(serviceImageUrl.trim());
       const res = await apiClient.post('/services', {
         title: serviceTitle.trim(),
         category: serviceCategory.trim(),
@@ -334,7 +340,7 @@ export default function ManualServiceDashboardScreen() {
         priceLabel: servicePriceLabel.trim() || '₹249 onwards',
         location: (serviceLocation || locationStr).trim() || 'Haveri Region',
         description: serviceDescription.trim() || undefined,
-        imageUrl: serviceImageUrl.trim() || undefined,
+        imageUrl: cloudflareUrl,
         isAvailable: true,
       });
 

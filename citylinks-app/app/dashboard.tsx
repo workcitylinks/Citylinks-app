@@ -67,6 +67,7 @@ import { apiClient } from '../api/apiClient';
 import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
 import { getManualServiceCoverImage, getDigitalServiceCoverImage } from '../utils/serviceImages';
 import { compressBanner } from '../utils/imageCompressor';
+import { uploadImageToCloudflare } from '../services/imageUpload';
 
 export default function DashboardScreen() {
   const { userData, refreshAuth, isShopPhoneEnabled, refreshPhoneSetting } = useApp();
@@ -347,8 +348,13 @@ export default function DashboardScreen() {
       showError('Provider or business name is required', 'Missing Provider');
       return;
     }
+    if (!adminManualImage) {
+      showError('Service banner photo is compulsory. Please capture or select an image.', 'Photo Compulsory');
+      return;
+    }
     try {
       setSubmittingManual(true);
+      const cloudflareUrl = await uploadImageToCloudflare(adminManualImage);
       await apiClient.post('/services', {
         title: adminManualTitle.trim(),
         category: adminManualCategory.trim(),
@@ -357,7 +363,7 @@ export default function DashboardScreen() {
         priceLabel: adminManualPrice.trim() || '₹249 onwards',
         location: adminManualLocation.trim() || 'Haveri Region',
         description: adminManualDesc.trim() || undefined,
-        imageUrl: adminManualImage || undefined,
+        imageUrl: cloudflareUrl,
         isAvailable: true,
       });
       showSuccess(`Manual service "${adminManualTitle.trim()}" published to Book Services!`, 'Service Published');
@@ -447,8 +453,13 @@ export default function DashboardScreen() {
       showError('Specialist or company name is required', 'Missing Specialist');
       return;
     }
+    if (!adminDigitalImage) {
+      showError('Portfolio banner photo is compulsory. Please capture or select an image.', 'Photo Compulsory');
+      return;
+    }
     try {
       setSubmittingDigital(true);
+      const cloudflareUrl = await uploadImageToCloudflare(adminDigitalImage);
       await apiClient.post('/marketplace/digital-providers', {
         name: adminDigitalName.trim(),
         serviceType: adminDigitalDomain.trim(),
@@ -457,7 +468,7 @@ export default function DashboardScreen() {
         location: adminDigitalLocation.trim() || 'Online & Haveri Region',
         description: adminDigitalOffering.trim() || undefined,
         badge: adminDigitalBadge.trim() || 'Verified',
-        imageUrl: adminDigitalImage || undefined,
+        imageUrl: cloudflareUrl,
         isAvailable: true,
       });
       showSuccess(`Digital specialist "${adminDigitalName.trim()}" published to Digital Services!`, 'Specialist Published');

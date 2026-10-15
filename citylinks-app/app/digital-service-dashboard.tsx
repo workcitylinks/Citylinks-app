@@ -62,6 +62,7 @@ import { ImageEnlargeModal } from '../components/ui/ImageEnlargeModal';
 import { getDigitalServiceCoverImage } from '../utils/serviceImages';
 import { compressBanner } from '../utils/imageCompressor';
 import { LazyImage } from '../components/ui/LazyImage';
+import { uploadImageToCloudflare } from '../services/imageUpload';
 
 export default function DigitalServiceDashboardScreen() {
   const { userData } = useApp();
@@ -333,9 +334,14 @@ export default function DigitalServiceDashboardScreen() {
       showError('Digital domain / category is required', 'Missing Domain');
       return;
     }
+    if (!serviceImageUrl.trim()) {
+      showError('Portfolio banner photo is compulsory. Please capture or select an image.', 'Photo Compulsory');
+      return;
+    }
 
     try {
       setAddingService(true);
+      const cloudflareUrl = await uploadImageToCloudflare(serviceImageUrl.trim());
       await apiClient.post('/marketplace/digital-providers', {
         name: specialistName.trim(),
         serviceType: serviceDomain.trim(),
@@ -344,7 +350,7 @@ export default function DigitalServiceDashboardScreen() {
         location: (serviceLocation || locationStr).trim() || 'Online & Haveri Region',
         description: serviceDescription.trim() || serviceTitle.trim(),
         badge: serviceBadge.trim() || 'Verified',
-        imageUrl: serviceImageUrl.trim() || undefined,
+        imageUrl: cloudflareUrl,
         isAvailable: true,
       });
 

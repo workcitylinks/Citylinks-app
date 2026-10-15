@@ -20,6 +20,7 @@ import notificationRoutes from './routes/notifications';
 import joinRequestsRoutes from './routes/joinRequests';
 import adminRoutes from './routes/admin';
 import orderRoutes from './routes/orders';
+import uploadRoutes from './routes/upload';
 import { seedAll } from '../prisma/seed';
 
 // Ensure database is completely seeded on startup
@@ -40,6 +41,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/join-requests', joinRequestsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/upload', uploadRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'CityLinks API is running' });

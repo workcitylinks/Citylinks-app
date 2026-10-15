@@ -50,6 +50,7 @@ import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { apiClient } from '../api/apiClient';
 import { compressBanner, compressDocument } from '../utils/imageCompressor';
+import { uploadImageToCloudflare } from '../services/imageUpload';
 
 interface RoleOption {
   id: 'MERCHANT' | 'MANUAL_SERVICE_PROVIDER' | 'DIGITAL_SERVICE_PROVIDER' | 'LABOR' | 'TRANSPORT';
@@ -533,12 +534,43 @@ export default function JoinUsScreen() {
       }
     }
 
+    const isManual = selectedRole === 'MANUAL_SERVICE_PROVIDER' || selectedRole === 'LABOR';
+    const isDigital = selectedRole === 'DIGITAL_SERVICE_PROVIDER';
+    const isShop = selectedRole === 'MERCHANT';
+    const isTransport = selectedRole === 'TRANSPORT';
+
+    if (isShop && !shopPhoto) {
+      showError('Storefront / business photo is compulsory. Please capture or select a photo.', 'Photo Compulsory');
+      return;
+    }
+    if (isTransport) {
+      if (!transportLicensePhoto) {
+        showError('Driving License photo is compulsory.', 'Document Compulsory');
+        return;
+      }
+      if (!transportAadhaarPhoto) {
+        showError('Aadhaar Card photo is compulsory.', 'Document Compulsory');
+        return;
+      }
+    }
+
     try {
       setSubmitting(true);
-      const isManual = selectedRole === 'MANUAL_SERVICE_PROVIDER' || selectedRole === 'LABOR';
-      const isDigital = selectedRole === 'DIGITAL_SERVICE_PROVIDER';
-      const isShop = selectedRole === 'MERCHANT';
-      const isTransport = selectedRole === 'TRANSPORT';
+
+      // Upload photos to Cloudflare Images
+      let cloudflareShopPhoto: string | undefined = undefined;
+      let cloudflareLicensePhoto: string | undefined = undefined;
+      let cloudflareAadhaarPhoto: string | undefined = undefined;
+
+      if (shopPhoto) {
+        cloudflareShopPhoto = await uploadImageToCloudflare(shopPhoto);
+      }
+      if (transportLicensePhoto) {
+        cloudflareLicensePhoto = await uploadImageToCloudflare(transportLicensePhoto);
+      }
+      if (transportAadhaarPhoto) {
+        cloudflareAadhaarPhoto = await uploadImageToCloudflare(transportAadhaarPhoto);
+      }
 
       // Build transport multi-vehicles payload
       const vehiclesPayload: Array<any> = isTransport
@@ -610,11 +642,11 @@ export default function JoinUsScreen() {
         location: location.trim(),
         phone: phone.trim(),
         email: email.trim(),
-        imageUrl: isTransport ? undefined : (shopPhoto || undefined),
+        imageUrl: isTransport ? undefined : cloudflareShopPhoto,
         drivingLicense: isTransport ? transportLicense.trim().toUpperCase() : undefined,
-        drivingLicensePhoto: isTransport ? (transportLicensePhoto || undefined) : undefined,
+        drivingLicensePhoto: isTransport ? cloudflareLicensePhoto : undefined,
         aadhaarNumber: isTransport ? transportAadhaar.trim() : undefined,
-        aadhaarPhoto: isTransport ? (transportAadhaarPhoto || undefined) : undefined,
+        aadhaarPhoto: isTransport ? cloudflareAadhaarPhoto : undefined,
         vehicles: isTransport ? vehiclesPayload : undefined,
         vehiclePlate: isTransport ? vehiclesPayload[0]?.plateNumber : undefined,
         vehicleModel: isTransport ? vehiclesPayload[0]?.modelName : undefined,

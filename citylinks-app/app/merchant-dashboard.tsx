@@ -50,6 +50,7 @@ import { queryCache } from '../utils/queryCache';
 import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
 import { compressBanner, compressProductImage } from '../utils/imageCompressor';
 import { LazyImage } from '../components/ui/LazyImage';
+import { uploadImageToCloudflare } from '../services/imageUpload';
 
 export default function MerchantDashboardScreen() {
   const { userData } = useApp();
@@ -374,16 +375,21 @@ export default function MerchantDashboardScreen() {
       showError('Please enter a valid price', 'Invalid Price');
       return;
     }
+    if (!prodImage) {
+      showError('Product photo is compulsory. Please capture or select an image.', 'Photo Compulsory');
+      return;
+    }
 
     try {
       setAddingProduct(true);
+      const cloudflareUrl = await uploadImageToCloudflare(prodImage);
       const targetId = shop?.id && shop.id !== 'temp-shop' ? shop.id : 'my-shop';
       await apiClient.post(`/shops/${targetId}/products`, {
         name: prodName.trim(),
         price: priceNum,
         unit: prodUnit.trim() || 'piece',
         stock: parseInt(prodStock) || 100,
-        imageUrl: prodImage || undefined,
+        imageUrl: cloudflareUrl,
       });
 
       showSuccess(`Added "${prodName}" to your storefront!`, 'Product Added');
@@ -442,6 +448,10 @@ export default function MerchantDashboardScreen() {
       showError('Discount offer badge is required (e.g. 20% OFF)', 'Missing Discount');
       return;
     }
+    if (!dealImage) {
+      showError('Deal banner photo is compulsory. Please capture or select an image.', 'Photo Compulsory');
+      return;
+    }
 
     const shopName = shop?.name || `${userData?.fullName || 'My'} Store`;
     const cat = dealCategory.trim() || shop?.category || 'Shopping';
@@ -449,6 +459,7 @@ export default function MerchantDashboardScreen() {
 
     try {
       setAddingDeal(true);
+      const cloudflareUrl = await uploadImageToCloudflare(dealImage);
       await apiClient.post('/deals', {
         title: dealTitle.trim(),
         discount: dealDiscount.trim(),
@@ -456,7 +467,7 @@ export default function MerchantDashboardScreen() {
         merchantName: shopName,
         validUntil: dealValidUntil.trim() || 'Limited time offer',
         linkUrl,
-        imageUrl: dealImage || undefined,
+        imageUrl: cloudflareUrl,
         broadcastNotification: true,
       });
 
@@ -841,9 +852,6 @@ export default function MerchantDashboardScreen() {
                         {products.length} ITEMS
                       </Text>
                     </View>
-                    <Text style={{ fontSize: 11, color: '#64748b', fontWeight: '500' }} numberOfLines={1}>
-                      • Items displayed in your store
-                    </Text>
                   </View>
                 </View>
               </View>
@@ -1667,7 +1675,7 @@ export default function MerchantDashboardScreen() {
               <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6 }}>
                 Product Photo (Optional)
               </Text>
-              
+
               {prodImage ? (
                 <View
                   style={{
