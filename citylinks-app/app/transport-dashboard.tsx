@@ -1819,7 +1819,7 @@ export default function TransportDashboardScreen() {
                 ) : (
                   <View className="mt-2 bg-slate-100/70 p-2.5 rounded-xl border border-dashed border-slate-300 flex-row items-center justify-between">
                     <View className="flex-1 mr-2">
-                      <Text className="text-xs font-semibold text-slate-600">DL Photo (Optional for now)</Text>
+                      <Text className="text-xs font-semibold text-slate-600">DL Photo <Text className="text-red-500">*</Text></Text>
                       <Text className="text-[10px] text-slate-400">Can be uploaded anytime from Edit Profile</Text>
                     </View>
                     <TouchableOpacity
@@ -1875,7 +1875,7 @@ export default function TransportDashboardScreen() {
                 ) : (
                   <View className="mt-2 bg-slate-100/70 p-2.5 rounded-xl border border-dashed border-slate-300 flex-row items-center justify-between">
                     <View className="flex-1 mr-2">
-                      <Text className="text-xs font-semibold text-slate-600">Aadhaar Photo (Optional for now)</Text>
+                      <Text className="text-xs font-semibold text-slate-600">Aadhaar Photo <Text className="text-red-500">*</Text></Text>
                       <Text className="text-[10px] text-slate-400">Can be uploaded anytime from Edit Profile</Text>
                     </View>
                     <TouchableOpacity
@@ -2229,7 +2229,7 @@ export default function TransportDashboardScreen() {
                 <View className="mt-2.5 bg-slate-50 p-3 rounded-2xl border border-slate-200">
                   <View className="flex-row items-center justify-between mb-2">
                     <Text className="text-xs font-bold text-slate-800">
-                      Driving License Photo (Optional for now)
+                      Driving License Photo <Text className="text-red-500">*</Text>
                     </Text>
                     {editLicensePhoto && (
                       <TouchableOpacity
@@ -2292,7 +2292,7 @@ export default function TransportDashboardScreen() {
                 <View className="mt-2.5 bg-slate-50 p-3 rounded-2xl border border-slate-200">
                   <View className="flex-row items-center justify-between mb-2">
                     <Text className="text-xs font-bold text-slate-800">
-                      Aadhaar Card Photo (Optional for now)
+                      Aadhaar Card Photo <Text className="text-red-500">*</Text>
                     </Text>
                     {editAadhaarPhoto && (
                       <TouchableOpacity

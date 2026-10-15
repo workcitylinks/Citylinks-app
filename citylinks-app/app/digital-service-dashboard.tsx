@@ -1449,10 +1449,10 @@ export default function DigitalServiceDashboardScreen() {
                 <View style={{ marginBottom: 16 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                     <Text style={{ fontSize: 12, fontWeight: '800', color: '#0f172a' }}>
-                      Portfolio / Banner Photo (Optional)
+                      Portfolio / Banner Photo <Text style={{ color: '#ef4444' }}>*</Text>
                     </Text>
-                    <Text style={{ fontSize: 10, color: '#7c3aed', fontWeight: '800' }}>
-                      Auto Demo If Blank
+                    <Text style={{ fontSize: 10, color: '#ef4444', fontWeight: '800' }}>
+                      Required *
                     </Text>
                   </View>
 

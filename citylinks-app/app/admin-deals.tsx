@@ -902,7 +902,7 @@ export default function AdminDealsScreen() {
                 {/* 7. Image */}
                 <View style={{ marginBottom: 14 }}>
                   <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6 }}>
-                    Deal Photo (Optional)
+                    Deal Photo <Text style={{ color: '#ef4444' }}>*</Text>
                   </Text>
                   {dealImage && (
                     <View style={{ height: 130, borderRadius: 12, overflow: 'hidden', marginBottom: 8, position: 'relative' }}>

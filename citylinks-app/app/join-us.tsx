@@ -1487,10 +1487,10 @@ export default function JoinUsScreen() {
                   <View className="mb-4">
                     <View className="flex-row items-center justify-between mb-1">
                       <Text className="text-xs font-bold text-slate-700 uppercase">
-                        Photo of Driving License
+                        Photo of Driving License <Text className="text-red-500">*</Text>
                       </Text>
-                      <View className="bg-blue-100 px-2 py-0.5 rounded-full border border-blue-200">
-                        <Text className="text-[10px] font-bold text-blue-700">Optional</Text>
+                      <View className="bg-red-50 px-2 py-0.5 rounded-full border border-red-200">
+                        <Text className="text-[10px] font-bold text-red-600">Compulsory *</Text>
                       </View>
                     </View>
                     <Text className="text-[11px] text-slate-500 mb-2">
@@ -1573,10 +1573,10 @@ export default function JoinUsScreen() {
                   <View>
                     <View className="flex-row items-center justify-between mb-1">
                       <Text className="text-xs font-bold text-slate-700 uppercase">
-                        Photo of Aadhaar Card
+                        Photo of Aadhaar Card <Text className="text-red-500">*</Text>
                       </Text>
-                      <View className="bg-blue-100 px-2 py-0.5 rounded-full border border-blue-200">
-                        <Text className="text-[10px] font-bold text-blue-700">Optional</Text>
+                      <View className="bg-red-50 px-2 py-0.5 rounded-full border border-red-200">
+                        <Text className="text-[10px] font-bold text-red-600">Compulsory *</Text>
                       </View>
                     </View>
                     <Text className="text-[11px] text-slate-500 mb-2">
@@ -2367,10 +2367,10 @@ export default function JoinUsScreen() {
               <View className="mt-4">
                 <View className="flex-row items-center justify-between mb-1.5">
                   <Text className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Photo of the Shop
+                    Photo of the Storefront / Business <Text className="text-red-500">*</Text>
                   </Text>
-                  <View className="bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
-                    <Text className="text-[10px] font-bold text-slate-500">Optional</Text>
+                  <View className="bg-red-50 px-2 py-0.5 rounded-full border border-red-200">
+                    <Text className="text-[10px] font-bold text-red-600">Compulsory *</Text>
                   </View>
                 </View>
                 <Text className="text-xs text-slate-400 mb-3">

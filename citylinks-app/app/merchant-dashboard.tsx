@@ -1673,7 +1673,7 @@ export default function MerchantDashboardScreen() {
             {/* Product Image Selector (Camera & Gallery) */}
             <View style={{ marginBottom: 14 }}>
               <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6 }}>
-                Product Photo (Optional)
+                Product Photo <Text style={{ color: '#ef4444' }}>*</Text>
               </Text>
 
               {prodImage ? (
@@ -2005,7 +2005,7 @@ export default function MerchantDashboardScreen() {
                 {/* 5. Deal Photo Selector */}
                 <View style={{ marginBottom: 14 }}>
                   <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6 }}>
-                    Offer Promotional Photo (Optional)
+                    Offer Promotional Photo <Text style={{ color: '#ef4444' }}>*</Text>
                   </Text>
                   {dealImage ? (
                     <View
