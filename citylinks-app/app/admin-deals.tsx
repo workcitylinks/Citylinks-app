@@ -39,6 +39,8 @@ import { useToast } from '../context/ToastContext';
 import { DealItem } from '../queries/marketplaceQueries';
 import { queryCache } from '../utils/queryCache';
 import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
+import { compressBanner } from '../utils/imageCompressor';
+import { LazyImage } from '../components/ui/LazyImage';
 
 export default function AdminDealsScreen() {
   const { showSuccess, showError } = useToast();
@@ -115,8 +117,9 @@ export default function AdminDealsScreen() {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setDealImage(result.assets[0].uri);
-        showSuccess('Deal photo captured!', 'Success');
+        const compressed = await compressBanner(result.assets[0].uri);
+        setDealImage(compressed);
+        showSuccess('Deal photo captured & compressed!', 'Success');
       }
     } catch (err: any) {
       showError('Failed to capture photo from camera.', 'Camera Error');
@@ -140,8 +143,9 @@ export default function AdminDealsScreen() {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setDealImage(result.assets[0].uri);
-        showSuccess('Deal image selected!', 'Success');
+        const compressed = await compressBanner(result.assets[0].uri);
+        setDealImage(compressed);
+        showSuccess('Deal image selected & compressed!', 'Success');
       }
     } catch (err: any) {
       showError('Failed to select image from gallery.', 'Gallery Error');
@@ -643,10 +647,11 @@ export default function AdminDealsScreen() {
                       backgroundColor: '#f1f5f9',
                     }}
                   >
-                    <Image
+                    <LazyImage
                       source={{ uri: deal.imageUrl! }}
                       style={{ width: '100%', height: '100%' }}
-                      resizeMode="cover"
+                      contentFit="cover"
+                      loaderColor="#2563eb"
                     />
                   </View>
                 )}

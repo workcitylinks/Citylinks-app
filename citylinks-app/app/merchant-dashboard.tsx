@@ -48,6 +48,8 @@ import { ShopItem, ProductItem, DealItem } from '../queries/marketplaceQueries';
 import { getShopCoverImage, getProductCoverImage } from './shop-detail';
 import { queryCache } from '../utils/queryCache';
 import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
+import { compressBanner, compressProductImage } from '../utils/imageCompressor';
+import { LazyImage } from '../components/ui/LazyImage';
 
 export default function MerchantDashboardScreen() {
   const { userData } = useApp();
@@ -118,8 +120,9 @@ export default function MerchantDashboardScreen() {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setDealImage(result.assets[0].uri);
-        showSuccess('Deal photo captured!', 'Success');
+        const compressed = await compressBanner(result.assets[0].uri);
+        setDealImage(compressed);
+        showSuccess('Deal photo captured & compressed!', 'Success');
       }
     } catch (err: any) {
       console.error('Camera error:', err);
@@ -145,8 +148,9 @@ export default function MerchantDashboardScreen() {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setDealImage(result.assets[0].uri);
-        showSuccess('Deal image selected from gallery!', 'Success');
+        const compressed = await compressBanner(result.assets[0].uri);
+        setDealImage(compressed);
+        showSuccess('Deal image selected & compressed!', 'Success');
       }
     } catch (err: any) {
       console.error('Gallery error:', err);
@@ -172,8 +176,9 @@ export default function MerchantDashboardScreen() {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setProdImage(result.assets[0].uri);
-        showSuccess('Product photo captured!', 'Success');
+        const compressed = await compressProductImage(result.assets[0].uri);
+        setProdImage(compressed);
+        showSuccess('Product photo captured & compressed!', 'Success');
       }
     } catch (err: any) {
       console.error('Camera error:', err);
@@ -199,8 +204,9 @@ export default function MerchantDashboardScreen() {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setProdImage(result.assets[0].uri);
-        showSuccess('Product image selected from gallery!', 'Success');
+        const compressed = await compressProductImage(result.assets[0].uri);
+        setProdImage(compressed);
+        showSuccess('Product image selected & compressed!', 'Success');
       }
     } catch (err: any) {
       console.error('Gallery error:', err);
@@ -952,7 +958,7 @@ export default function MerchantDashboardScreen() {
                         borderColor: '#e2e8f0',
                       }}
                     >
-                      <Image
+                      <LazyImage
                         source={{ uri: itemImageUri }}
                         style={{
                           width: 44,
@@ -961,7 +967,8 @@ export default function MerchantDashboardScreen() {
                           backgroundColor: '#e2e8f0',
                           marginRight: 12,
                         }}
-                        resizeMode="cover"
+                        contentFit="cover"
+                        loaderColor="#2563eb"
                       />
                       <View style={{ flex: 1, marginRight: 10 }}>
                         <Text style={{ fontSize: 14, fontWeight: '800', color: '#0f172a' }}>
@@ -1212,10 +1219,11 @@ export default function MerchantDashboardScreen() {
                             backgroundColor: '#e2e8f0',
                           }}
                         >
-                          <Image
+                          <LazyImage
                             source={{ uri: deal.imageUrl! }}
                             style={{ width: '100%', height: '100%' }}
-                            resizeMode="cover"
+                            contentFit="cover"
+                            loaderColor="#2563eb"
                           />
                         </View>
                       )}

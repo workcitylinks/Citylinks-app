@@ -52,6 +52,8 @@ import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
 import { ServiceItem, DealItem } from '../queries/marketplaceQueries';
 import { ImageEnlargeModal } from '../components/ui/ImageEnlargeModal';
 import { getManualServiceCoverImage } from '../utils/serviceImages';
+import { compressBanner } from '../utils/imageCompressor';
+import { LazyImage } from '../components/ui/LazyImage';
 
 export default function ManualServiceDashboardScreen() {
   const { userData } = useApp();
@@ -273,8 +275,9 @@ export default function ManualServiceDashboardScreen() {
         quality: 0.7,
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setServiceImageUrl(result.assets[0].uri);
-        showSuccess('Service banner photo captured!', 'Success');
+        const compressed = await compressBanner(result.assets[0].uri);
+        setServiceImageUrl(compressed);
+        showSuccess('Service banner photo captured & compressed!', 'Success');
       }
     } catch (err: any) {
       console.error('Camera error:', err);
@@ -298,8 +301,9 @@ export default function ManualServiceDashboardScreen() {
         quality: 0.7,
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setServiceImageUrl(result.assets[0].uri);
-        showSuccess('Service banner photo selected!', 'Success');
+        const compressed = await compressBanner(result.assets[0].uri);
+        setServiceImageUrl(compressed);
+        showSuccess('Service banner photo selected & compressed!', 'Success');
       }
     } catch (err: any) {
       console.error('Gallery error:', err);
@@ -867,10 +871,11 @@ export default function ManualServiceDashboardScreen() {
                           borderColor: '#e2e8f0',
                         }}
                       >
-                        <Image
+                        <LazyImage
                           source={{ uri: coverUrl }}
                           style={{ width: '100%', height: '100%' }}
-                          resizeMode="cover"
+                          contentFit="cover"
+                          loaderColor="#2563eb"
                         />
                         <View
                           style={{

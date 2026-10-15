@@ -58,6 +58,7 @@ import { getShopCoverImage } from "./shop-detail";
 import { ImageEnlargeModal } from "../components/ui/ImageEnlargeModal";
 import { getManualServiceCoverImage } from "../utils/serviceImages";
 import { UserAvatar } from "../components/ui/UserAvatar";
+import { LazyImage } from "../components/ui/LazyImage";
 
 // Removed unused interfaces
 
@@ -1474,10 +1475,11 @@ export default function Index() {
                             }}
                             className="relative rounded-xl overflow-hidden mb-3 border border-slate-200/80"
                           >
-                            <Image
+                            <LazyImage
                               source={{ uri: coverUrl }}
                               style={{ width: '100%', height: 115 }}
-                              resizeMode="cover"
+                              contentFit="cover"
+                              loaderColor="#2563eb"
                             />
                             <View className="absolute top-2 right-2 bg-black/60 px-2 py-0.5 rounded-full flex-row items-center gap-1 border border-white/20">
                               <Maximize2 size={10} color="#ffffff" />
@@ -1665,10 +1667,11 @@ export default function Index() {
                                 }}
                                 className="relative mr-3"
                               >
-                                <Image
+                                <LazyImage
                                   source={{ uri: shopCover }}
-                                  className="w-16 h-16 rounded-xl bg-slate-100 border border-slate-200/70"
-                                  resizeMode="cover"
+                                  style={{ width: 64, height: 64, borderRadius: 12 }}
+                                  contentFit="cover"
+                                  loaderColor="#2563eb"
                                 />
                                 <View className="absolute bottom-1 right-1 bg-black/60 p-1 rounded-md">
                                   <Maximize2 size={9} color="#ffffff" />

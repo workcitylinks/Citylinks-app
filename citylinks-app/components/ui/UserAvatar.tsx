@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, Image, StyleSheet, StyleProp, ViewStyle } from 'react-native';
+import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 
 interface UserAvatarProps {
   avatarUrl?: string | null;
@@ -36,14 +37,17 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
 
   const cleanAvatarUrl = avatarUrl && typeof avatarUrl === 'string' && avatarUrl.trim().length > 0 ? avatarUrl.trim() : null;
 
-  // First preference: Avatar URL
+  // First preference: Avatar URL with lazy loading & disk/memory cache
   if (cleanAvatarUrl && !hasError) {
     return (
       <View style={[styles.avatarContainer, containerStyle, style]}>
-        <Image
+        <ExpoImage
           source={{ uri: cleanAvatarUrl }}
           style={[styles.avatarImage, containerStyle]}
-          resizeMode="cover"
+          contentFit="cover"
+          transition={200}
+          cachePolicy="memory-disk"
+          priority="high"
           onError={() => setHasError(true)}
         />
       </View>

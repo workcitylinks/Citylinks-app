@@ -42,6 +42,7 @@ import { useApp } from '../context/AppContext';
 import { apiClient } from '../api/apiClient';
 import RefreshableScrollView from '../components/ui/RefreshableScrollView';
 import { ImageEnlargerModal } from '../components/ImageEnlargerModal';
+import { LazyImage } from '../components/ui/LazyImage';
 
 export default function ReceivedOrdersScreen() {
   const { showSuccess, showError } = useToast();
@@ -656,10 +657,11 @@ export default function ReceivedOrdersScreen() {
               >
                 {item.imageUrl ? (
                   <>
-                    <Image
+                    <LazyImage
                       source={{ uri: item.imageUrl }}
-                      className="w-full h-full"
-                      resizeMode="cover"
+                      style={{ width: '100%', height: '100%' }}
+                      contentFit="cover"
+                      loaderColor="#2563eb"
                     />
                     <View className="absolute bottom-0.5 right-0.5 bg-black/60 rounded px-0.5">
                       <Text className="text-[7px] text-white">🔍</Text>

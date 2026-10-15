@@ -66,6 +66,7 @@ import { useProfile, useJoinRequests, JoinRequestItem } from '../queries/marketp
 import { apiClient } from '../api/apiClient';
 import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
 import { getManualServiceCoverImage, getDigitalServiceCoverImage } from '../utils/serviceImages';
+import { compressBanner } from '../utils/imageCompressor';
 
 export default function DashboardScreen() {
   const { userData, refreshAuth, isShopPhoneEnabled, refreshPhoneSetting } = useApp();
@@ -301,8 +302,9 @@ export default function DashboardScreen() {
         quality: 0.7,
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setAdminManualImage(result.assets[0].uri);
-        showSuccess('Manual service photo captured!', 'Success');
+        const compressed = await compressBanner(result.assets[0].uri);
+        setAdminManualImage(compressed);
+        showSuccess('Manual service photo captured & compressed!', 'Success');
       }
     } catch (err: any) {
       showError('Failed to capture photo from camera.', 'Camera Error');
@@ -325,8 +327,9 @@ export default function DashboardScreen() {
         quality: 0.7,
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setAdminManualImage(result.assets[0].uri);
-        showSuccess('Manual service photo selected!', 'Success');
+        const compressed = await compressBanner(result.assets[0].uri);
+        setAdminManualImage(compressed);
+        showSuccess('Manual service photo selected & compressed!', 'Success');
       }
     } catch (err: any) {
       showError('Failed to select photo from gallery.', 'Gallery Error');
@@ -403,8 +406,9 @@ export default function DashboardScreen() {
         quality: 0.7,
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setAdminDigitalImage(result.assets[0].uri);
-        showSuccess('Digital specialist photo captured!', 'Success');
+        const compressed = await compressBanner(result.assets[0].uri);
+        setAdminDigitalImage(compressed);
+        showSuccess('Digital specialist photo captured & compressed!', 'Success');
       }
     } catch (err: any) {
       showError('Failed to capture photo from camera.', 'Camera Error');
@@ -427,8 +431,9 @@ export default function DashboardScreen() {
         quality: 0.7,
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setAdminDigitalImage(result.assets[0].uri);
-        showSuccess('Digital specialist photo selected!', 'Success');
+        const compressed = await compressBanner(result.assets[0].uri);
+        setAdminDigitalImage(compressed);
+        showSuccess('Digital specialist photo selected & compressed!', 'Success');
       }
     } catch (err: any) {
       showError('Failed to select photo from gallery.', 'Gallery Error');

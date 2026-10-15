@@ -36,6 +36,7 @@ import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
 import { useShopDetail, ProductItem } from '../queries/marketplaceQueries';
 import { useUserLocation } from '../hooks/useUserLocation';
 import { computeShopDistance } from '../utils/distance';
+import { LazyImage } from '../components/ui/LazyImage';
 
 export const getShopCoverImage = (shopItem?: { imageUrl?: string | null; category?: string | null; name?: string } | null) => {
   if (shopItem?.imageUrl && shopItem.imageUrl.trim().length > 0) {
@@ -345,10 +346,11 @@ export default function ShopDetailScreen() {
                     shadowRadius: 8,
                   }}
                 >
-                  <Image
+                  <LazyImage
                     source={{ uri: coverPhotoUri }}
                     style={{ width: '100%', height: '100%' }}
-                    resizeMode="cover"
+                    contentFit="cover"
+                    loaderColor="#ea580c"
                   />
 
                   {/* Gradient Overlay for contrast */}
@@ -571,10 +573,11 @@ export default function ShopDetailScreen() {
                           const prodCoverUri = getProductCoverImage(product, shop?.category);
                           return (
                             <View className="w-full h-28 rounded-xl bg-slate-100 mb-2.5 overflow-hidden border border-slate-150 relative">
-                              <Image
+                              <LazyImage
                                 source={{ uri: prodCoverUri }}
                                 style={{ width: '100%', height: '100%' }}
-                                resizeMode="cover"
+                                contentFit="cover"
+                                loaderColor="#ea580c"
                               />
 
                               {/* Tap to Enlarge Pill */}
@@ -807,10 +810,11 @@ export default function ShopDetailScreen() {
               }}
             >
               {previewImageUri ? (
-                <Image
+                <LazyImage
                   source={{ uri: previewImageUri }}
                   style={{ width: '100%', height: '100%' }}
-                  resizeMode="contain"
+                  contentFit="contain"
+                  loaderColor="#ffffff"
                 />
               ) : (
                 <Store size={64} color="#64748b" />

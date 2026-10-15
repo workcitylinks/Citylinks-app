@@ -3,13 +3,13 @@ import {
   Modal,
   View,
   Text,
-  Image,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
   Dimensions,
   StatusBar,
 } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { X, Maximize2 } from 'lucide-react-native';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -79,10 +79,13 @@ export const ImageEnlargeModal: React.FC<ImageEnlargeModalProps> = ({
               <Text style={styles.loadingText}>Loading HD Image...</Text>
             </View>
           )}
-          <Image
+          <ExpoImage
             source={{ uri: imageUrl }}
             style={styles.mainImage}
-            resizeMode="contain"
+            contentFit="contain"
+            transition={200}
+            cachePolicy="memory-disk"
+            priority="high"
             onLoadStart={() => setLoading(true)}
             onLoadEnd={() => setLoading(false)}
           />

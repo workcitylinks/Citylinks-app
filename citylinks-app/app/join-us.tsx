@@ -49,6 +49,7 @@ import * as Location from 'expo-location';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { apiClient } from '../api/apiClient';
+import { compressBanner, compressDocument } from '../utils/imageCompressor';
 
 interface RoleOption {
   id: 'MERCHANT' | 'MANUAL_SERVICE_PROVIDER' | 'DIGITAL_SERVICE_PROVIDER' | 'LABOR' | 'TRANSPORT';
@@ -317,8 +318,9 @@ export default function JoinUsScreen() {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setShopPhoto(result.assets[0].uri);
-        showSuccess('Photo captured!', 'Success');
+        const compressed = await compressBanner(result.assets[0].uri);
+        setShopPhoto(compressed);
+        showSuccess('Photo captured & compressed!', 'Success');
       }
     } catch (err: any) {
       console.error('Camera error:', err);
@@ -343,8 +345,9 @@ export default function JoinUsScreen() {
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setShopPhoto(result.assets[0].uri);
-        showSuccess('Photo selected from gallery!', 'Success');
+        const compressed = await compressBanner(result.assets[0].uri);
+        setShopPhoto(compressed);
+        showSuccess('Photo selected & compressed!', 'Success');
       }
     } catch (err: any) {
       console.error('Gallery error:', err);
@@ -364,8 +367,9 @@ export default function JoinUsScreen() {
       }
       const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [4, 3], quality: 0.7 });
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setTransportLicensePhoto(result.assets[0].uri);
-        showSuccess('Driving License photo captured!', 'Captured');
+        const compressed = await compressDocument(result.assets[0].uri);
+        setTransportLicensePhoto(compressed);
+        showSuccess('Driving License photo captured & compressed!', 'Captured');
       }
     } catch (err: any) {
       showError('Failed to capture license photo from camera.', 'Camera Error');
@@ -381,8 +385,9 @@ export default function JoinUsScreen() {
       }
       const result = await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [4, 3], quality: 0.7 });
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setTransportLicensePhoto(result.assets[0].uri);
-        showSuccess('Driving License photo selected!', 'Selected');
+        const compressed = await compressDocument(result.assets[0].uri);
+        setTransportLicensePhoto(compressed);
+        showSuccess('Driving License photo selected & compressed!', 'Selected');
       }
     } catch (err: any) {
       showError('Failed to select license photo from gallery.', 'Gallery Error');
@@ -399,8 +404,9 @@ export default function JoinUsScreen() {
       }
       const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [4, 3], quality: 0.7 });
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setTransportAadhaarPhoto(result.assets[0].uri);
-        showSuccess('Aadhaar photo captured!', 'Captured');
+        const compressed = await compressDocument(result.assets[0].uri);
+        setTransportAadhaarPhoto(compressed);
+        showSuccess('Aadhaar photo captured & compressed!', 'Captured');
       }
     } catch (err: any) {
       showError('Failed to capture Aadhaar photo from camera.', 'Camera Error');
@@ -416,8 +422,9 @@ export default function JoinUsScreen() {
       }
       const result = await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [4, 3], quality: 0.7 });
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setTransportAadhaarPhoto(result.assets[0].uri);
-        showSuccess('Aadhaar photo selected!', 'Selected');
+        const compressed = await compressDocument(result.assets[0].uri);
+        setTransportAadhaarPhoto(compressed);
+        showSuccess('Aadhaar photo selected & compressed!', 'Selected');
       }
     } catch (err: any) {
       showError('Failed to select Aadhaar photo from gallery.', 'Gallery Error');

@@ -28,6 +28,7 @@ import {
 import { useToast } from '../context/ToastContext';
 import { useApp } from '../context/AppContext';
 import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
+import { LazyImage } from '../components/ui/LazyImage';
 import { useShops, ShopItem } from '../queries/marketplaceQueries';
 import { useUserLocation } from '../hooks/useUserLocation';
 import { computeShopDistance, FormattedDistance } from '../utils/distance';
@@ -339,10 +340,11 @@ export default function NearbyShopsScreen() {
                     {/* Top Row: Shop Photo + Info */}
                     <View className="flex-row items-start">
                       {/* Shop Photo Thumbnail */}
-                      <Image
+                      <LazyImage
                         source={{ uri: shopPhoto }}
-                        className="w-16 h-16 rounded-xl bg-slate-100 mr-3 border border-slate-200/60"
-                        resizeMode="cover"
+                        style={{ width: 64, height: 64, borderRadius: 12, marginRight: 12 }}
+                        contentFit="cover"
+                        loaderColor="#2563eb"
                       />
 
                       {/* Main Details */}

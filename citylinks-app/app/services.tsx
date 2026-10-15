@@ -28,6 +28,7 @@ import { useApp } from '../context/AppContext';
 import { useServices, ServiceItem } from '../queries/marketplaceQueries';
 import { ImageEnlargeModal } from '../components/ui/ImageEnlargeModal';
 import { getManualServiceCoverImage, DEMO_MANUAL_SERVICE_FALLBACK } from '../utils/serviceImages';
+import { LazyImage } from '../components/ui/LazyImage';
 
 // Redesigned Service Card with guaranteed image loading and graceful demo fallback
 const ServiceCard = ({
@@ -62,11 +63,12 @@ const ServiceCard = ({
         }
         className="relative w-full h-[155px] bg-slate-100"
       >
-        <Image
+        <LazyImage
           source={{ uri: imgUri }}
           onError={() => setImgUri(DEMO_MANUAL_SERVICE_FALLBACK)}
           style={{ width: '100%', height: '100%' }}
-          resizeMode="cover"
+          contentFit="cover"
+          loaderColor="#2563eb"
         />
 
         {/* Top-Left Category Badge */}

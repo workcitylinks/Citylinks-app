@@ -36,6 +36,7 @@ import { useApp } from '../context/AppContext';
 import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
 import { ImageEnlargeModal } from '../components/ui/ImageEnlargeModal';
 import { getDigitalServiceCoverImage, DEMO_DIGITAL_SERVICE_FALLBACK } from '../utils/serviceImages';
+import { LazyImage } from '../components/ui/LazyImage';
 import {
   useDigitalServices,
   useDigitalProviders,
@@ -76,11 +77,12 @@ const DigitalProviderCard = ({
         }
         className="relative w-full h-[155px] bg-slate-100"
       >
-        <Image
+        <LazyImage
           source={{ uri: imgUri }}
           onError={() => setImgUri(DEMO_DIGITAL_SERVICE_FALLBACK)}
           style={{ width: '100%', height: '100%' }}
-          resizeMode="cover"
+          contentFit="cover"
+          loaderColor="#7c3aed"
         />
 
         {/* Top-Left Category Badge */}

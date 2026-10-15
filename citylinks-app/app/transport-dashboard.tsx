@@ -56,6 +56,7 @@ import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { apiClient } from '../api/apiClient';
 import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
+import { compressDocument } from '../utils/imageCompressor';
 
 // Vehicle type choices (User specified: Car, Bike, Auto, Taxi, Tempo, Truck, Other)
 const VEHICLE_TYPES = [
@@ -363,8 +364,9 @@ export default function TransportDashboardScreen() {
       }
       const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [4, 3], quality: 0.7 });
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setEditLicensePhoto(result.assets[0].uri);
-        showSuccess('Driving License photo captured!', 'Captured');
+        const compressed = await compressDocument(result.assets[0].uri);
+        setEditLicensePhoto(compressed);
+        showSuccess('Driving License photo captured & compressed!', 'Captured');
       }
     } catch (err: any) {
       showError('Failed to capture license photo from camera.', 'Camera Error');
@@ -380,8 +382,9 @@ export default function TransportDashboardScreen() {
       }
       const result = await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [4, 3], quality: 0.7 });
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setEditLicensePhoto(result.assets[0].uri);
-        showSuccess('Driving License photo selected!', 'Selected');
+        const compressed = await compressDocument(result.assets[0].uri);
+        setEditLicensePhoto(compressed);
+        showSuccess('Driving License photo selected & compressed!', 'Selected');
       }
     } catch (err: any) {
       showError('Failed to select license photo from gallery.', 'Gallery Error');
@@ -397,8 +400,9 @@ export default function TransportDashboardScreen() {
       }
       const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [4, 3], quality: 0.7 });
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setEditAadhaarPhoto(result.assets[0].uri);
-        showSuccess('Aadhaar photo captured!', 'Captured');
+        const compressed = await compressDocument(result.assets[0].uri);
+        setEditAadhaarPhoto(compressed);
+        showSuccess('Aadhaar photo captured & compressed!', 'Captured');
       }
     } catch (err: any) {
       showError('Failed to capture Aadhaar photo from camera.', 'Camera Error');
@@ -414,8 +418,9 @@ export default function TransportDashboardScreen() {
       }
       const result = await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [4, 3], quality: 0.7 });
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setEditAadhaarPhoto(result.assets[0].uri);
-        showSuccess('Aadhaar photo selected!', 'Selected');
+        const compressed = await compressDocument(result.assets[0].uri);
+        setEditAadhaarPhoto(compressed);
+        showSuccess('Aadhaar photo selected & compressed!', 'Selected');
       }
     } catch (err: any) {
       showError('Failed to select Aadhaar photo from gallery.', 'Gallery Error');
