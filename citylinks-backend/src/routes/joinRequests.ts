@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { Role } from '@prisma/client';
 import { createAndSendNotification } from '../services/notificationService';
+import { deleteMultipleCloudflareImages } from '../utils/cloudflareImages';
 
 const router = Router();
 
@@ -668,6 +669,34 @@ router.patch('/:id/reject', authenticateToken, async (req: AuthenticatedRequest,
   } catch (error: any) {
     console.error('Error rejecting join request:', error);
     return res.status(500).json({ error: error.message || 'Failed to reject join request.' });
+  }
+});
+
+/**
+ * DELETE /api/join-requests/:id
+ * Delete a join request and remove all associated Cloudflare photos
+ */
+router.delete('/:id', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const request = await prisma.joinRequest.findUnique({ where: { id } });
+    if (!request) {
+      return res.status(404).json({ error: 'Join request not found.' });
+    }
+
+    const imagesToDelete: (string | null | undefined)[] = [
+      request.imageUrl,
+      request.drivingLicensePhoto,
+      request.aadhaarPhoto,
+    ];
+    await deleteMultipleCloudflareImages(imagesToDelete);
+
+    await prisma.joinRequest.delete({ where: { id } });
+
+    return res.json({ success: true, message: 'Join request and associated photos removed successfully.' });
+  } catch (error: any) {
+    console.error('Error deleting join request:', error);
+    return res.status(500).json({ error: error.message || 'Failed to delete join request.' });
   }
 });
 

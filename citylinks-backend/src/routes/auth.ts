@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { cacheResponse, invalidateCache } from '../middleware/cache';
 import { prisma } from '../lib/prisma';
 import { verifyGoogleToken, upsertGoogleUser, renderGoogleAccountChooserHtml } from '../services/googleAuthService';
+import { deleteCloudflareImage, deleteMultipleCloudflareImages, handleImageReplacement } from '../utils/cloudflareImages';
 
 const router = express.Router();
 
@@ -864,6 +865,15 @@ router.put('/profile', authenticateToken, async (req: any, res) => {
       }
     }
 
+    // Check if avatarUrl is changing to delete old Cloudflare image
+    const existingUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { avatarUrl: true },
+    });
+    if (existingUser && avatarUrl !== undefined) {
+      await handleImageReplacement(existingUser.avatarUrl, avatarUrl);
+    }
+
     const updated = await prisma.user.update({
       where: { id: userId },
       data: {
@@ -913,6 +923,37 @@ router.delete('/account', authenticateToken, async (req: any, res) => {
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
+
+    // Permanently delete user from database and clean up all Cloudflare images
+    const imagesToDelete: (string | null | undefined)[] = [user.avatarUrl];
+
+    // Find and delete join requests images
+    try {
+      const joinReqs = await prisma.joinRequest.findMany({
+        where: { userId },
+        select: { imageUrl: true, drivingLicensePhoto: true, aadhaarPhoto: true },
+      });
+      joinReqs.forEach((jr) => {
+        if (jr.imageUrl) imagesToDelete.push(jr.imageUrl);
+        if (jr.drivingLicensePhoto) imagesToDelete.push(jr.drivingLicensePhoto);
+        if (jr.aadhaarPhoto) imagesToDelete.push(jr.aadhaarPhoto);
+      });
+    } catch (e) {}
+
+    // Find and delete transport driver photos
+    try {
+      const drivers = await prisma.transportProvider.findMany({
+        where: { userId },
+        select: { drivingLicensePhoto: true, aadhaarPhoto: true },
+      });
+      drivers.forEach((dr) => {
+        if (dr.drivingLicensePhoto) imagesToDelete.push(dr.drivingLicensePhoto);
+        if (dr.aadhaarPhoto) imagesToDelete.push(dr.aadhaarPhoto);
+      });
+    } catch (e) {}
+
+    // Delete collected images from Cloudflare
+    await deleteMultipleCloudflareImages(imagesToDelete);
 
     // Permanently delete user from database
     await prisma.user.delete({

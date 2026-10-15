@@ -44,3 +44,31 @@ export async function uploadImageToCloudflare(localUri: string): Promise<string>
 
   return response.data.url;
 }
+
+/**
+ * Deletes an image from Cloudflare Images via the backend DELETE /upload endpoint.
+ * Returns true if successful or if not a Cloudflare image.
+ */
+export async function deleteImageFromCloudflare(imageUrlOrId?: string | null): Promise<boolean> {
+  if (!imageUrlOrId || typeof imageUrlOrId !== 'string') {
+    return false;
+  }
+
+  const clean = imageUrlOrId.trim();
+  if (!clean) return false;
+
+  // Only attempt deletion if it's an imagedelivery.net URL or UUID
+  if (clean.startsWith('file://') || clean.startsWith('data:') || (!clean.includes('imagedelivery.net') && clean.includes('://'))) {
+    return true; // Not a Cloudflare image, nothing to delete
+  }
+
+  try {
+    const res = await apiClient.delete('/upload', {
+      data: { url: clean },
+    });
+    return Boolean(res.data?.success);
+  } catch (err) {
+    console.warn('[Cloudflare Delete Client Error]:', err);
+    return false;
+  }
+}

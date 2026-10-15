@@ -2,6 +2,7 @@ import express from 'express';
 import { cacheResponse, invalidateCache } from '../middleware/cache';
 import { prisma } from '../lib/prisma';
 import { createAndSendNotification } from '../services/notificationService';
+import { deleteCloudflareImage, handleImageReplacement } from '../utils/cloudflareImages';
 
 const router = express.Router();
 
@@ -566,6 +567,14 @@ router.post('/digital-providers', async (req, res) => {
 router.delete('/digital-providers/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const existing = await prisma.digitalServiceProvider.findUnique({
+      where: { id: String(id) },
+    });
+
+    if (existing && existing.imageUrl) {
+      await deleteCloudflareImage(existing.imageUrl);
+    }
+
     await prisma.digitalServiceProvider.delete({
       where: { id: String(id) },
     });
@@ -576,6 +585,39 @@ router.delete('/digital-providers/:id', async (req, res) => {
   } catch (err: any) {
     console.error('Error deleting digital service provider:', err);
     res.status(500).json({ error: err.message || 'Failed to delete digital service provider' });
+  }
+});
+
+// PUT /api/marketplace/digital-providers/:id - Update a digital service offering
+router.put('/digital-providers/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, serviceType, priceLabel, phone, location, description, imageUrl, badge, isAvailable } = req.body;
+
+    const existing = await prisma.digitalServiceProvider.findUnique({ where: { id: String(id) } });
+    if (existing && imageUrl !== undefined) {
+      await handleImageReplacement(existing.imageUrl, imageUrl);
+    }
+
+    const updated = await prisma.digitalServiceProvider.update({
+      where: { id: String(id) },
+      data: {
+        ...(name ? { name: name.trim() } : {}),
+        ...(serviceType ? { serviceType: serviceType.trim() } : {}),
+        ...(priceLabel ? { priceLabel: priceLabel.trim() } : {}),
+        ...(phone !== undefined ? { phone: phone ? phone.trim() : null } : {}),
+        ...(location ? { location: location.trim() } : {}),
+        ...(description !== undefined ? { description: description ? description.trim() : null } : {}),
+        ...(imageUrl !== undefined ? { imageUrl: imageUrl && imageUrl.trim().length > 0 ? imageUrl.trim() : null } : {}),
+        ...(badge ? { badge: badge.trim() } : {}),
+        ...(typeof isAvailable === 'boolean' ? { isAvailable } : {}),
+      },
+    });
+
+    invalidateCache();
+    res.json({ success: true, provider: updated });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to update digital service provider' });
   }
 });
 

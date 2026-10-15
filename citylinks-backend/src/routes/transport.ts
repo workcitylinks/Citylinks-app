@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma';
 import { optionalAuthToken, AuthenticatedRequest } from '../middleware/auth';
 import { sendPushToUser } from '../services/firebase';
 import { createAndSendNotification } from '../services/notificationService';
+import { deleteCloudflareImage, handleImageReplacement } from '../utils/cloudflareImages';
 
 const router = express.Router();
 
@@ -1847,6 +1848,13 @@ router.post('/driver/register', optionalAuthToken, async (req: AuthenticatedRequ
         },
       });
     } else {
+      if (drivingLicensePhoto !== undefined) {
+        await handleImageReplacement(driver.drivingLicensePhoto, drivingLicensePhoto);
+      }
+      if (aadhaarPhoto !== undefined) {
+        await handleImageReplacement(driver.aadhaarPhoto, aadhaarPhoto);
+      }
+
       driver = await prisma.transportProvider.update({
         where: { id: driver.id },
         data: {
@@ -1924,6 +1932,16 @@ router.put('/driver/profile', optionalAuthToken, async (req: AuthenticatedReques
     const targetId = driverId || (req.user?.id ? (await prisma.transportProvider.findFirst({ where: { userId: req.user.id } }))?.id : null);
     if (!targetId) {
       return res.status(400).json({ error: 'Driver ID or authenticated session required' });
+    }
+
+    const existingDriver = await prisma.transportProvider.findUnique({ where: { id: targetId } });
+    if (existingDriver) {
+      if (drivingLicensePhoto !== undefined) {
+        await handleImageReplacement(existingDriver.drivingLicensePhoto, drivingLicensePhoto);
+      }
+      if (aadhaarPhoto !== undefined) {
+        await handleImageReplacement(existingDriver.aadhaarPhoto, aadhaarPhoto);
+      }
     }
 
     const updated = await prisma.transportProvider.update({

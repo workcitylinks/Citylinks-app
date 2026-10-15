@@ -2,6 +2,7 @@ import express from 'express';
 import { cacheResponse, invalidateCache } from '../middleware/cache';
 import { prisma } from '../lib/prisma';
 import { createAndSendNotification } from '../services/notificationService';
+import { deleteCloudflareImage } from '../utils/cloudflareImages';
 
 const router = express.Router();
 
@@ -199,6 +200,10 @@ router.delete('/:id', async (req, res) => {
     });
 
     if (deal) {
+      if (deal.imageUrl) {
+        await deleteCloudflareImage(deal.imageUrl);
+      }
+
       await prisma.deal.delete({
         where: { id },
       });

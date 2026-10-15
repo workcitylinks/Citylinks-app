@@ -2,6 +2,7 @@ import express from 'express';
 import { cacheResponse, invalidateCache } from '../middleware/cache';
 import { prisma } from '../lib/prisma';
 import { getShopPhoneDisplayEnabled } from './admin';
+import { deleteCloudflareImage, handleImageReplacement } from '../utils/cloudflareImages';
 
 const router = express.Router();
 
@@ -253,6 +254,11 @@ router.put('/my-shop', async (req, res) => {
       }
     }
 
+    const existingShop = await prisma.shop.findUnique({ where: { id: String(id) } });
+    if (existingShop && imageUrl !== undefined) {
+      await handleImageReplacement(existingShop.imageUrl, imageUrl);
+    }
+
     const updated = await prisma.shop.update({
       where: { id: String(id) },
       data: {
@@ -417,6 +423,14 @@ router.post('/:id/products', async (req, res) => {
 router.delete('/:id/products/:productId', async (req, res) => {
   try {
     const { productId } = req.params;
+    const product = await prisma.product.findUnique({
+      where: { id: String(productId) },
+    });
+
+    if (product && product.imageUrl) {
+      await deleteCloudflareImage(product.imageUrl);
+    }
+
     await prisma.product.delete({
       where: { id: String(productId) },
     });
@@ -425,6 +439,35 @@ router.delete('/:id/products/:productId', async (req, res) => {
   } catch (err: any) {
     console.error('Error deleting product:', err);
     res.status(500).json({ error: err.message || 'Failed to delete product' });
+  }
+});
+
+// DELETE /api/shops/:id - Delete a shop and all its products & Cloudflare images
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const shop = await prisma.shop.findUnique({
+      where: { id: String(id) },
+      include: { products: true },
+    });
+
+    if (shop) {
+      if (shop.imageUrl) {
+        await deleteCloudflareImage(shop.imageUrl);
+      }
+      for (const prod of shop.products) {
+        if (prod.imageUrl) {
+          await deleteCloudflareImage(prod.imageUrl);
+        }
+      }
+      await prisma.shop.delete({ where: { id: String(id) } });
+    }
+
+    invalidateCache();
+    res.json({ success: true, message: 'Shop and all associated items deleted successfully' });
+  } catch (err: any) {
+    console.error('Error deleting shop:', err);
+    res.status(500).json({ error: err.message || 'Failed to delete shop' });
   }
 });
 

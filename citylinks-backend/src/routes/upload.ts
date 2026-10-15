@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import multer from 'multer';
+import { deleteCloudflareImage, extractCloudflareImageId } from '../utils/cloudflareImages';
 
 const router = express.Router();
 
@@ -101,6 +102,39 @@ router.post('/', upload.single('image'), async (req: Request, res: Response): Pr
   } catch (error: any) {
     console.error('[Upload Exception]:', error);
     res.status(500).json({ error: error.message || 'Internal server error during image upload' });
+  }
+});
+
+/**
+ * DELETE /api/upload
+ * Deletes an image from Cloudflare Images by URL or ID.
+ * Body or query params: { url: string } or { id: string }
+ */
+router.delete('/', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const target = req.body?.url || req.body?.id || req.query?.url || req.query?.id;
+    if (!target || typeof target !== 'string') {
+      res.status(400).json({ error: 'Please provide an image url or id to delete.' });
+      return;
+    }
+
+    const imageId = extractCloudflareImageId(target);
+    if (!imageId) {
+      // If it is not a Cloudflare image (e.g. Unsplash or Google avatar), acknowledge without error
+      res.json({ success: true, message: 'Not a Cloudflare hosted image, no remote deletion required.' });
+      return;
+    }
+
+    const deleted = await deleteCloudflareImage(imageId);
+    res.json({
+      success: true,
+      deleted,
+      imageId,
+      message: deleted ? 'Image deleted from Cloudflare successfully.' : 'Image already deleted or failed to delete.',
+    });
+  } catch (error: any) {
+    console.error('[Delete Image Exception]:', error);
+    res.status(500).json({ error: error.message || 'Failed to delete image from Cloudflare' });
   }
 });
 

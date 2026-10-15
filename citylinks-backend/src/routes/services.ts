@@ -2,6 +2,7 @@ import express from 'express';
 import { cacheResponse, invalidateCache } from '../middleware/cache';
 import { prisma } from '../lib/prisma';
 import { createAndSendNotification } from '../services/notificationService';
+import { deleteCloudflareImage, handleImageReplacement } from '../utils/cloudflareImages';
 
 const router = express.Router();
 
@@ -259,6 +260,14 @@ router.post('/', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const existing = await prisma.service.findUnique({
+      where: { id: String(id) },
+    });
+
+    if (existing && existing.imageUrl) {
+      await deleteCloudflareImage(existing.imageUrl);
+    }
+
     await prisma.service.delete({
       where: { id: String(id) },
     });
@@ -335,15 +344,25 @@ router.patch('/:id/toggle-featured', async (req, res) => {
   }
 });
 
-// PUT /api/services/:id - Super Admin update service details
+// PUT /api/services/:id - Super Admin / Provider update service details
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { isFeatured, isPopular, isSponsored, isAvailable, rating, priceLabel } = req.body;
+    const { isFeatured, isPopular, isSponsored, isAvailable, rating, priceLabel, imageUrl, title, description, phone, location } = req.body;
+
+    const existing = await prisma.service.findUnique({ where: { id: String(id) } });
+    if (existing && imageUrl !== undefined) {
+      await handleImageReplacement(existing.imageUrl, imageUrl);
+    }
 
     const updated = await prisma.service.update({
       where: { id: String(id) },
       data: {
+        ...(title ? { title: title.trim() } : {}),
+        ...(description !== undefined ? { description: description ? description.trim() : null } : {}),
+        ...(phone !== undefined ? { phone: phone ? phone.trim() : null } : {}),
+        ...(location ? { location: location.trim() } : {}),
+        ...(imageUrl !== undefined ? { imageUrl: imageUrl && imageUrl.trim().length > 0 ? imageUrl.trim() : null } : {}),
         ...(typeof isFeatured === 'boolean' ? { isFeatured } : {}),
         ...(typeof isPopular === 'boolean' ? { isPopular } : {}),
         ...(typeof isSponsored === 'boolean' ? { isSponsored } : {}),
@@ -352,6 +371,8 @@ router.put('/:id', async (req, res) => {
         ...(priceLabel ? { priceLabel } : {}),
       },
     });
+
+    invalidateCache();
     res.json(updated);
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to update service' });
