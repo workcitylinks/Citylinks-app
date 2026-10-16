@@ -32,17 +32,7 @@ import { useToast } from '../context/ToastContext';
 import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
 import { triggerLocalNotification } from '../services/pushNotifications';
 import * as WebBrowser from 'expo-web-browser';
-
-export interface NotificationItem {
-  id: string;
-  title: string;
-  message: string;
-  type: string; // info, promo, order, alert, app_update
-  route?: string;
-  isRead: boolean;
-  createdAt: string;
-  updatedAt?: string;
-}
+import { useNotifications, NotificationItem } from '../queries/marketplaceQueries';
 
 // Swipeable Notification Row Component
 interface SwipeableNotificationCardProps {
@@ -280,75 +270,62 @@ export default function NotificationsScreen() {
   const { userToken, userData, refreshNotificationCount } = useApp();
   const { showSuccess, showError } = useToast();
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'unread'>('all');
   const [testingPush, setTestingPush] = useState(false);
 
-  const fetchNotifications = async (isRefresh = false) => {
-    try {
-      if (!isRefresh) setLoading(true);
-      const res = await apiClient.get('/notifications');
-      if (res.data?.notifications) {
-        // Filter rules:
-        // 1. Seen/read notifications disappear after 24 hours
-        // 2. Unread notifications disappear after 1 week (7 days)
-        const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
-        const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-        const now = Date.now();
-
-        const activeNotifications = (res.data.notifications as NotificationItem[]).filter(
-          (n) => {
-            if (n.isRead) {
-              const seenDate = new Date(n.updatedAt || n.createdAt).getTime();
-              if (now - seenDate >= TWENTY_FOUR_HOURS_MS) {
-                return false; // Seen notification automatically disappeared after 24 hours
-              }
-            } else {
-              const createdDate = new Date(n.createdAt).getTime();
-              if (now - createdDate >= ONE_WEEK_MS) {
-                return false; // Unread notification automatically disappeared after 1 week
-              }
-            }
-            return true;
-          }
-        );
-
-        setNotifications(activeNotifications);
-      }
-    } catch (err) {
-      console.error('Error fetching notifications:', err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+  // Hook handles memory caching (<1ms instant render), deduplication & background revalidation
+  const {
+    notifications: rawNotificationsList,
+    loading,
+    refreshing,
+    refetch,
+    mutate,
+  } = useNotifications(Boolean(userToken));
 
   useEffect(() => {
     if (!userToken) {
       showError('Please sign in to view your notifications', 'Sign In Required');
       router.replace('/auth' as any);
-      return;
     }
-    setNotifications([]);
-    fetchNotifications();
-  }, [userToken, userData?.id]);
+  }, [userToken]);
 
   useFocusEffect(
     React.useCallback(() => {
       if (userToken) {
-        fetchNotifications(true);
+        refetch();
         refreshNotificationCount();
       }
-    }, [userToken])
+    }, [userToken, refetch, refreshNotificationCount])
   );
 
   const onRefresh = () => {
-    setRefreshing(true);
-    fetchNotifications(true);
+    refetch({ force: true });
     refreshNotificationCount();
   };
+
+  // Filter rules:
+  // 1. Seen/read notifications disappear after 24 hours
+  // 2. Unread notifications disappear after 1 week (7 days)
+  const notifications = useMemo(() => {
+    const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+    const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+
+    return rawNotificationsList.filter((n) => {
+      if (n.isRead) {
+        const seenDate = new Date(n.updatedAt || n.createdAt).getTime();
+        if (now - seenDate >= TWENTY_FOUR_HOURS_MS) {
+          return false;
+        }
+      } else {
+        const createdDate = new Date(n.createdAt).getTime();
+        if (now - createdDate >= ONE_WEEK_MS) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [rawNotificationsList]);
 
   const unreadCount = useMemo(() => {
     return notifications.filter((n) => !n.isRead).length;
@@ -383,12 +360,18 @@ export default function NotificationsScreen() {
   const handleMarkAsRead = async (id: string, currentlyRead: boolean) => {
     if (currentlyRead) return;
     try {
+      // Optimistic cache mutation
+      mutate((prev) => {
+        if (!prev) return { notifications: [], unreadCount: 0 };
+        return {
+          ...prev,
+          notifications: prev.notifications.map((n) =>
+            n.id === id ? { ...n, isRead: true, updatedAt: new Date().toISOString() } : n
+          ),
+          unreadCount: Math.max(0, (prev.unreadCount || 1) - 1),
+        };
+      });
       await apiClient.patch(`/notifications/${id}/read`);
-      setNotifications((prev) =>
-        prev.map((n) =>
-          n.id === id ? { ...n, isRead: true, updatedAt: new Date().toISOString() } : n
-        )
-      );
       await refreshNotificationCount();
     } catch (err) {
       console.error('Error marking as read:', err);
@@ -452,12 +435,17 @@ export default function NotificationsScreen() {
   const handleMarkAllAsRead = async () => {
     if (unreadCount === 0) return;
     try {
-      await apiClient.post('/notifications/mark-all-read');
       const nowIso = new Date().toISOString();
-      setNotifications((prev) =>
-        prev.map((n) => ({ ...n, isRead: true, updatedAt: nowIso }))
-      );
+      mutate((prev) => {
+        if (!prev) return { notifications: [], unreadCount: 0 };
+        return {
+          ...prev,
+          notifications: prev.notifications.map((n) => ({ ...n, isRead: true, updatedAt: nowIso })),
+          unreadCount: 0,
+        };
+      });
       showSuccess('All notifications marked as read', 'Success');
+      await apiClient.post('/notifications/mark-all-read');
       await refreshNotificationCount();
     } catch (err) {
       console.error('Error marking all as read:', err);
@@ -466,16 +454,23 @@ export default function NotificationsScreen() {
 
   const handleDeleteNotification = async (id: string) => {
     try {
-      // Optimistic delete
-      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      // Optimistic cache mutation
+      mutate((prev) => {
+        if (!prev) return { notifications: [], unreadCount: 0 };
+        const updated = prev.notifications.filter((n) => n.id !== id);
+        return {
+          ...prev,
+          notifications: updated,
+          unreadCount: updated.filter((n) => !n.isRead).length,
+        };
+      });
       showSuccess('Notification cleared', 'Deleted');
       await apiClient.delete(`/notifications/${id}`);
       await refreshNotificationCount();
     } catch (err: any) {
       console.error('Error deleting notification:', err);
       showError('Failed to clear notification');
-      // Refetch if error
-      fetchNotifications(true);
+      refetch({ force: true });
     }
   };
 
@@ -498,7 +493,7 @@ export default function NotificationsScreen() {
       });
 
       setTimeout(() => {
-        fetchNotifications(true);
+        refetch({ force: true });
       }, 1200);
     } catch (err: any) {
       console.warn('Test push notification error:', err);

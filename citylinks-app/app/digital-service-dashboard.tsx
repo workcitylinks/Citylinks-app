@@ -132,18 +132,25 @@ export default function DigitalServiceDashboardScreen() {
     price: string;
   } | null>(null);
 
-  // Fetch all services created by this digital specialist
-  const fetchServices = async (targetName?: string) => {
+  // Fetch all services created by this digital specialist with caching
+  const fetchServices = async (targetName?: string, force = false) => {
+    const name = targetName || specialistName;
+    const cacheKey = `specialist-digital-services-${name}`;
+    if (!force) {
+      const cached = queryCache.get<any[]>(cacheKey);
+      if (cached && Array.isArray(cached)) {
+        setServices(cached);
+      }
+    }
     try {
-      setLoadingServices(true);
-      const name = targetName || specialistName;
-      const res = await apiClient.get('/marketplace/digital-providers', {
-        params: {
-          all: 'true',
-          providerName: name,
-        },
-      });
+      if (services.length === 0 && !queryCache.get(cacheKey)) setLoadingServices(true);
+      const res = await queryCache.fetchWithDeduplication(cacheKey, () =>
+        apiClient.get('/marketplace/digital-providers', {
+          params: { all: 'true', providerName: name },
+        })
+      );
       if (Array.isArray(res.data)) {
+        queryCache.set(cacheKey, res.data, 60_000, true);
         setServices(res.data);
       }
     } catch (err) {
@@ -153,15 +160,23 @@ export default function DigitalServiceDashboardScreen() {
     }
   };
 
-  // Fetch deals created by this digital specialist
-  const fetchDeals = async (targetName?: string) => {
+  // Fetch deals created by this digital specialist with caching
+  const fetchDeals = async (targetName?: string, force = false) => {
+    const name = targetName || specialistName;
+    const cacheKey = `specialist-digital-deals-${name}`;
+    if (!force) {
+      const cached = queryCache.get<any[]>(cacheKey);
+      if (cached && Array.isArray(cached)) {
+        setSpecialistDeals(cached);
+      }
+    }
     try {
-      setLoadingDeals(true);
-      const name = targetName || specialistName;
-      const res = await apiClient.get('/deals', {
-        params: { merchantName: name },
-      });
+      if (specialistDeals.length === 0 && !queryCache.get(cacheKey)) setLoadingDeals(true);
+      const res = await queryCache.fetchWithDeduplication(cacheKey, () =>
+        apiClient.get('/deals', { params: { merchantName: name } })
+      );
       if (Array.isArray(res.data)) {
+        queryCache.set(cacheKey, res.data, 60_000, true);
         setSpecialistDeals(res.data);
       }
     } catch (err) {

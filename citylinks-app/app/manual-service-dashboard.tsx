@@ -123,18 +123,25 @@ export default function ManualServiceDashboardScreen() {
     price: string;
   } | null>(null);
 
-  // Fetch all services created by this provider
-  const fetchServices = async (targetProvider?: string) => {
+  // Fetch all services created by this provider with caching
+  const fetchServices = async (targetProvider?: string, force = false) => {
+    const name = targetProvider || providerName;
+    const cacheKey = `manual-services-${name}`;
+    if (!force) {
+      const cached = queryCache.get<any[]>(cacheKey);
+      if (cached && Array.isArray(cached)) {
+        setServices(cached);
+      }
+    }
     try {
-      setLoadingServices(true);
-      const name = targetProvider || providerName;
-      const res = await apiClient.get('/services', {
-        params: {
-          all: 'true',
-          providerName: name,
-        },
-      });
+      if (services.length === 0 && !queryCache.get(cacheKey)) setLoadingServices(true);
+      const res = await queryCache.fetchWithDeduplication(cacheKey, () =>
+        apiClient.get('/services', {
+          params: { all: 'true', providerName: name },
+        })
+      );
       if (Array.isArray(res.data)) {
+        queryCache.set(cacheKey, res.data, 60_000, true);
         setServices(res.data);
       }
     } catch (err) {
@@ -144,15 +151,23 @@ export default function ManualServiceDashboardScreen() {
     }
   };
 
-  // Fetch deals created by this service provider
-  const fetchDeals = async (targetProvider?: string) => {
+  // Fetch deals created by this service provider with caching
+  const fetchDeals = async (targetProvider?: string, force = false) => {
+    const name = targetProvider || providerName;
+    const cacheKey = `manual-deals-${name}`;
+    if (!force) {
+      const cached = queryCache.get<any[]>(cacheKey);
+      if (cached && Array.isArray(cached)) {
+        setProviderDeals(cached);
+      }
+    }
     try {
-      setLoadingDeals(true);
-      const name = targetProvider || providerName;
-      const res = await apiClient.get('/deals', {
-        params: { merchantName: name },
-      });
+      if (providerDeals.length === 0 && !queryCache.get(cacheKey)) setLoadingDeals(true);
+      const res = await queryCache.fetchWithDeduplication(cacheKey, () =>
+        apiClient.get('/deals', { params: { merchantName: name } })
+      );
       if (Array.isArray(res.data)) {
+        queryCache.set(cacheKey, res.data, 60_000, true);
         setProviderDeals(res.data);
       }
     } catch (err) {

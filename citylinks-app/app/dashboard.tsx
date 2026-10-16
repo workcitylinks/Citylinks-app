@@ -65,6 +65,7 @@ import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { useProfile, useJoinRequests, JoinRequestItem } from '../queries/marketplaceQueries';
 import { apiClient } from '../api/apiClient';
+import { queryCache } from '../utils/queryCache';
 import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
 import { getManualServiceCoverImage, getDigitalServiceCoverImage } from '../utils/serviceImages';
 import { compressBanner } from '../utils/imageCompressor';
@@ -104,16 +105,28 @@ export default function DashboardScreen() {
   const [loadingPartnerDigital, setLoadingPartnerDigital] = useState(false);
 
   // Fetch Merchant's Storefront Details
-  const [shop, setShop] = useState<any | null>(null);
+  const [shop, setShop] = useState<any | null>(() => {
+    return queryCache.get<any>('my-shop-storefront');
+  });
   const [loadingShop, setLoadingShop] = useState(false);
 
-  const fetchShop = async () => {
+  const fetchShop = async (force = false) => {
     if (!isMerchant) return;
+    const cacheKey = 'my-shop-storefront';
+    if (!force) {
+      const cached = queryCache.get<any>(cacheKey);
+      if (cached) {
+        setShop(cached);
+      }
+    }
     try {
-      setLoadingShop(true);
-      const res = await apiClient.get('/shops/my-shop');
+      if (!shop && !queryCache.get(cacheKey)) setLoadingShop(true);
+      const res = await queryCache.fetchWithDeduplication(cacheKey, () =>
+        apiClient.get('/shops/my-shop')
+      );
       if (res.data?.shop) {
         setShop(res.data.shop);
+        queryCache.set(cacheKey, res.data.shop, 60_000, true);
       }
     } catch (err) {
       console.warn('Could not fetch shop in dashboard:', err);
@@ -122,21 +135,34 @@ export default function DashboardScreen() {
     }
   };
 
-  const fetchPartnerManualData = async () => {
+  const fetchPartnerManualData = async (force = false) => {
     if (!isManualService) return;
+    const pName = activeUser?.fullName ? `${activeUser.fullName} Services` : '';
+    const cacheKey = `partner-manual-data-${pName}`;
+    if (!force) {
+      const cached = queryCache.get<any>(cacheKey);
+      if (cached) {
+        setPartnerManualServices(cached.services || []);
+        setPartnerManualDeals(cached.deals || []);
+      }
+    }
     try {
-      setLoadingPartnerManual(true);
-      const pName = activeUser?.fullName ? `${activeUser.fullName} Services` : '';
+      if (partnerManualServices.length === 0 && !queryCache.get(cacheKey)) {
+        setLoadingPartnerManual(true);
+      }
       const [sRes, dRes] = await Promise.allSettled([
-        apiClient.get('/services', { params: { all: 'true', providerName: pName } }),
-        apiClient.get('/deals', { params: { merchantName: pName } }),
+        queryCache.fetchWithDeduplication(`${cacheKey}-services`, () =>
+          apiClient.get('/services', { params: { all: 'true', providerName: pName } })
+        ),
+        queryCache.fetchWithDeduplication(`${cacheKey}-deals`, () =>
+          apiClient.get('/deals', { params: { merchantName: pName } })
+        ),
       ]);
-      if (sRes.status === 'fulfilled' && Array.isArray(sRes.value.data)) {
-        setPartnerManualServices(sRes.value.data);
-      }
-      if (dRes.status === 'fulfilled' && Array.isArray(dRes.value.data)) {
-        setPartnerManualDeals(dRes.value.data);
-      }
+      const services = (sRes.status === 'fulfilled' && Array.isArray(sRes.value.data)) ? sRes.value.data : partnerManualServices;
+      const deals = (dRes.status === 'fulfilled' && Array.isArray(dRes.value.data)) ? dRes.value.data : partnerManualDeals;
+      setPartnerManualServices(services);
+      setPartnerManualDeals(deals);
+      queryCache.set(cacheKey, { services, deals }, 60_000, true);
     } catch (err) {
       console.warn('Could not fetch partner manual data:', err);
     } finally {
@@ -144,21 +170,34 @@ export default function DashboardScreen() {
     }
   };
 
-  const fetchPartnerDigitalData = async () => {
+  const fetchPartnerDigitalData = async (force = false) => {
     if (!isDigitalService) return;
+    const sName = activeUser?.fullName ? `${activeUser.fullName} Digital Studio` : '';
+    const cacheKey = `partner-digital-data-${sName}`;
+    if (!force) {
+      const cached = queryCache.get<any>(cacheKey);
+      if (cached) {
+        setPartnerDigitalServices(cached.services || []);
+        setPartnerDigitalDeals(cached.deals || []);
+      }
+    }
     try {
-      setLoadingPartnerDigital(true);
-      const sName = activeUser?.fullName ? `${activeUser.fullName} Digital Studio` : '';
+      if (partnerDigitalServices.length === 0 && !queryCache.get(cacheKey)) {
+        setLoadingPartnerDigital(true);
+      }
       const [sRes, dRes] = await Promise.allSettled([
-        apiClient.get('/marketplace/digital-providers', { params: { all: 'true', providerName: sName } }),
-        apiClient.get('/deals', { params: { merchantName: sName } }),
+        queryCache.fetchWithDeduplication(`${cacheKey}-services`, () =>
+          apiClient.get('/marketplace/digital-providers', { params: { all: 'true', providerName: sName } })
+        ),
+        queryCache.fetchWithDeduplication(`${cacheKey}-deals`, () =>
+          apiClient.get('/deals', { params: { merchantName: sName } })
+        ),
       ]);
-      if (sRes.status === 'fulfilled' && Array.isArray(sRes.value.data)) {
-        setPartnerDigitalServices(sRes.value.data);
-      }
-      if (dRes.status === 'fulfilled' && Array.isArray(dRes.value.data)) {
-        setPartnerDigitalDeals(dRes.value.data);
-      }
+      const services = (sRes.status === 'fulfilled' && Array.isArray(sRes.value.data)) ? sRes.value.data : partnerDigitalServices;
+      const deals = (dRes.status === 'fulfilled' && Array.isArray(dRes.value.data)) ? dRes.value.data : partnerDigitalDeals;
+      setPartnerDigitalServices(services);
+      setPartnerDigitalDeals(deals);
+      queryCache.set(cacheKey, { services, deals }, 60_000, true);
     } catch (err) {
       console.warn('Could not fetch partner digital data:', err);
     } finally {
@@ -174,9 +213,9 @@ export default function DashboardScreen() {
         refetchProfile(),
         refetchRequests(),
         refreshPhoneSetting(),
-        isMerchant ? fetchShop() : Promise.resolve(),
-        isManualService ? fetchPartnerManualData() : Promise.resolve(),
-        isDigitalService ? fetchPartnerDigitalData() : Promise.resolve(),
+        isMerchant ? fetchShop(true) : Promise.resolve(),
+        isManualService ? fetchPartnerManualData(true) : Promise.resolve(),
+        isDigitalService ? fetchPartnerDigitalData(true) : Promise.resolve(),
       ]);
     } catch (err) {
       console.error('Refresh dashboard error:', err);
@@ -498,11 +537,28 @@ export default function DashboardScreen() {
   const [submittingRelease, setSubmittingRelease] = useState(false);
   const [currentActiveRelease, setCurrentActiveRelease] = useState<any>(null);
 
-  const fetchLatestAppRelease = async () => {
+  const fetchLatestAppRelease = async (force = false) => {
+    const cacheKey = 'latest-app-release';
+    if (!force) {
+      const cached = queryCache.get<any>(cacheKey);
+      if (cached) {
+        setCurrentActiveRelease(cached);
+        if (cached.version) {
+          const currentV = cached.version.replace(/^v/, '');
+          const parts = currentV.split('.').map(Number);
+          if (parts.length === 3 && !isNaN(parts[2])) {
+            setReleaseVersion(`v${parts[0]}.${parts[1]}.${parts[2] + 1}`);
+          }
+        }
+      }
+    }
     try {
-      const res = await apiClient.get('/admin/app-release/latest');
+      const res = await queryCache.fetchWithDeduplication(cacheKey, () =>
+        apiClient.get('/admin/app-release/latest')
+      );
       if (res.data?.release) {
         setCurrentActiveRelease(res.data.release);
+        queryCache.set(cacheKey, res.data.release, 60_000, true);
         if (res.data.release.version) {
           const currentV = res.data.release.version.replace(/^v/, '');
           const parts = currentV.split('.').map(Number);

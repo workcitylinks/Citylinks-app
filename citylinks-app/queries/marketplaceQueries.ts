@@ -544,4 +544,150 @@ export function useJoinRequests(status?: string) {
     refetch: query.refetch,
   };
 }
+// ----------------- Notifications Hook -----------------
+export interface NotificationItem {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  route?: string;
+  isRead: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
 
+export interface NotificationsResponse {
+  notifications: NotificationItem[];
+  unreadCount: number;
+}
+
+export function useNotifications(enabled: boolean = true) {
+  const query = useApiQuery<NotificationsResponse>('/notifications', {
+    enabled,
+    ttlMs: 30_000,
+    persist: true,
+  });
+
+  return {
+    notifications: query.data?.notifications || [],
+    unreadCount: query.data?.unreadCount || 0,
+    loading: query.loading,
+    refreshing: query.refreshing,
+    error: query.error,
+    refetch: query.refetch,
+    mutate: query.mutate,
+  };
+}
+
+// ----------------- My Shop Hook (Merchant) -----------------
+export function useMyShop(enabled: boolean = true) {
+  const query = useApiQuery<{ shop: ShopItem | null }>('/shops/my-shop', {
+    enabled,
+    ttlMs: 60_000,
+    persist: true,
+  });
+
+  return {
+    shop: query.data?.shop || null,
+    loading: query.loading,
+    refreshing: query.refreshing,
+    error: query.error,
+    refetch: query.refetch,
+    mutate: query.mutate,
+  };
+}
+
+// ----------------- Passenger Rides & Live Vehicles (Transport) -----------------
+export interface PassengerRidesResponse {
+  success: boolean;
+  rides: any[];
+  activeRides: any[];
+  historyRides: any[];
+}
+
+export function usePassengerRides(enabled: boolean = true) {
+  const query = useApiQuery<PassengerRidesResponse>('/transport/my-rides', {
+    enabled,
+    ttlMs: 15_000,
+    persist: true,
+  });
+
+  return {
+    rides: query.data?.rides || [],
+    activeRides: query.data?.activeRides || [],
+    historyRides: query.data?.historyRides || [],
+    loading: query.loading,
+    refreshing: query.refreshing,
+    error: query.error,
+    refetch: query.refetch,
+    mutate: query.mutate,
+  };
+}
+
+export function useLiveVehicles(userLat?: number, userLng?: number, enabled: boolean = true) {
+  const params = useMemo(() => {
+    if (userLat !== undefined && userLng !== undefined) {
+      return { userLat, userLng, type: 'passenger' };
+    }
+    return { type: 'passenger' };
+  }, [userLat, userLng]);
+
+  const query = useApiQuery<any[]>('/transport/live-vehicles', {
+    params,
+    enabled,
+    ttlMs: 10_000,
+    persist: false,
+  });
+
+  return {
+    liveVehicles: query.data || [],
+    loading: query.loading,
+    refreshing: query.refreshing,
+    refetch: query.refetch,
+  };
+}
+
+// ----------------- Driver Dashboard Hook (Transport) -----------------
+export function useDriverDashboard(enabled: boolean = true) {
+  const driverQuery = useApiQuery<any>('/transport/driver/me', {
+    enabled,
+    ttlMs: 60_000,
+    persist: true,
+  });
+
+  const tripsQuery = useApiQuery<any>('/transport/driver/trips', {
+    enabled,
+    ttlMs: 20_000,
+    persist: true,
+  });
+
+  const refetch = async (opts?: { force?: boolean }) => {
+    await Promise.all([driverQuery.refetch(opts), tripsQuery.refetch(opts)]);
+  };
+
+  return {
+    driver: driverQuery.data?.driver || driverQuery.data || null,
+    activeTrip: tripsQuery.data?.activeTrip || null,
+    trips: tripsQuery.data?.trips || [],
+    loading: driverQuery.loading || tripsQuery.loading,
+    refreshing: driverQuery.refreshing || tripsQuery.refreshing,
+    error: driverQuery.error || tripsQuery.error,
+    refetch,
+  };
+}
+
+// ----------------- Latest App Release Hook -----------------
+export function useLatestAppRelease(enabled: boolean = true) {
+  const query = useApiQuery<{ success: boolean; release: any | null }>('/admin/app-release/latest', {
+    enabled,
+    ttlMs: 60_000,
+    persist: true,
+  });
+
+  return {
+    release: query.data?.release || null,
+    loading: query.loading,
+    refreshing: query.refreshing,
+    refetch: query.refetch,
+  };
+}

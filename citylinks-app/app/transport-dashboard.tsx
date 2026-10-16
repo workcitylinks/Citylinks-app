@@ -55,6 +55,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { apiClient } from '../api/apiClient';
+import { queryCache } from '../utils/queryCache';
 import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
 import { compressDocument } from '../utils/imageCompressor';
 import { uploadImageToCloudflare } from '../services/imageUpload';
@@ -229,12 +230,28 @@ export default function TransportDashboardScreen() {
   const [vIsPrimary, setVIsPrimary] = useState(false);
   const [savingVehicle, setSavingVehicle] = useState(false);
 
-  // Fetch driver profile & vehicles
-  const loadDriverData = useCallback(async (showIndicator = false) => {
+  // Fetch driver profile & vehicles with caching
+  const loadDriverData = useCallback(async (showIndicator = false, force = false) => {
+    const cacheKey = 'transport-driver-profile';
+    if (!force) {
+      const cached = queryCache.get<any>(cacheKey);
+      if (cached && cached.success) {
+        setDriver(cached.driver);
+        setVehicles(cached.vehicles || []);
+        setActiveVehicle(cached.activeVehicle || null);
+        setIsOnline(Boolean(cached.driver?.isAvailable));
+        if (cached.stats) setStats(cached.stats);
+        setPendingRequests(cached.pendingRequests || []);
+        setActiveTrip(cached.activeTrip || null);
+      }
+    }
     try {
-      if (showIndicator) setLoading(true);
-      const res = await apiClient.get('/transport/driver/me');
+      if (showIndicator && !driver && !queryCache.get(cacheKey)) setLoading(true);
+      const res = await queryCache.fetchWithDeduplication(cacheKey, () =>
+        apiClient.get('/transport/driver/me')
+      );
       if (res.data?.success) {
+        queryCache.set(cacheKey, res.data, 60_000, true);
         setDriver(res.data.driver);
         setVehicles(res.data.vehicles || []);
         setActiveVehicle(res.data.activeVehicle || null);
@@ -257,17 +274,29 @@ export default function TransportDashboardScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [showError]);
+  }, [showError, driver]);
 
-  // Fetch Trips
-  const loadTrips = useCallback(async () => {
+  // Fetch Trips with caching
+  const loadTrips = useCallback(async (force = false) => {
     if (!driver?.id) return;
+    const cacheKey = `transport-driver-trips-${driver.id}`;
+    if (!force) {
+      const cached = queryCache.get<any>(cacheKey);
+      if (cached && cached.success) {
+        setRecentTrips(cached.trips || []);
+        if (cached.requestedTrips) setPendingRequests(cached.requestedTrips);
+        if (cached.activeTrips && cached.activeTrips.length > 0) {
+          setActiveTrip(cached.activeTrips[0]);
+        }
+      }
+    }
     try {
-      setLoadingTrips(true);
-      const res = await apiClient.get('/transport/driver/trips', {
-        params: { driverId: driver.id },
-      });
+      if (recentTrips.length === 0 && !queryCache.get(cacheKey)) setLoadingTrips(true);
+      const res = await queryCache.fetchWithDeduplication(cacheKey, () =>
+        apiClient.get('/transport/driver/trips', { params: { driverId: driver.id } })
+      );
       if (res.data?.success) {
+        queryCache.set(cacheKey, res.data, 20_000, true);
         setRecentTrips(res.data.trips || []);
         if (res.data.requestedTrips) {
           setPendingRequests(res.data.requestedTrips);
@@ -283,7 +312,7 @@ export default function TransportDashboardScreen() {
     } finally {
       setLoadingTrips(false);
     }
-  }, [driver?.id]);
+  }, [driver?.id, recentTrips.length]);
 
   // Real-time polling: auto-refresh incoming ride requests every 3.5 seconds
   useEffect(() => {

@@ -50,6 +50,7 @@ import { useApp } from '../context/AppContext';
 import { useTransport } from '../queries/marketplaceQueries';
 import { calculateDistanceInMeters } from '../utils/distance';
 import { apiClient } from '../api/apiClient';
+import { queryCache } from '../utils/queryCache';
 
 // Modular Components
 import { RealLocationMap, LiveVehicleItem } from '../components/transport/RealLocationMap';
@@ -248,12 +249,27 @@ export default function BookTransportScreen() {
   const [loadingMyRides, setLoadingMyRides] = useState<boolean>(false);
   const [ridesSheetSubTab, setRidesSheetSubTab] = useState<'ongoing' | 'history'>('ongoing');
 
-  // Fetch passenger's active & past rides from server
-  const fetchMyRides = useCallback(async () => {
+  // Fetch passenger's active & past rides from server with caching
+  const fetchMyRides = useCallback(async (forceParam?: boolean | any) => {
+    const force = typeof forceParam === 'boolean' ? forceParam : false;
+    const cacheKey = 'passenger-my-rides';
+    if (!force) {
+      const cached = queryCache.get<any>(cacheKey);
+      if (cached && cached.success) {
+        setPassengerRides(cached.rides || []);
+        setPassengerActiveRides(cached.activeRides || []);
+        setPassengerHistoryRides(cached.historyRides || []);
+      }
+    }
     try {
-      setLoadingMyRides(true);
-      const res = await apiClient.get('/transport/my-rides');
+      if (passengerRides.length === 0 && !queryCache.get(cacheKey)) {
+        setLoadingMyRides(true);
+      }
+      const res = await queryCache.fetchWithDeduplication(cacheKey, () =>
+        apiClient.get('/transport/my-rides')
+      );
       if (res.data?.success) {
+        queryCache.set(cacheKey, res.data, 15_000, true);
         setPassengerRides(res.data.rides || []);
         setPassengerActiveRides(res.data.activeRides || []);
         setPassengerHistoryRides(res.data.historyRides || []);
@@ -285,7 +301,7 @@ export default function BookTransportScreen() {
     } finally {
       setLoadingMyRides(false);
     }
-  }, [activeBooking?.id]);
+  }, [activeBooking?.id, passengerRides.length, currentStep]);
 
   const handleRidesTabPress = useCallback(() => {
     setBottomNavTab('rides');
@@ -312,15 +328,23 @@ export default function BookTransportScreen() {
     }
   }, [showSuccess]);
 
-  // Fetch Real-time Vehicles from Database
+  // Fetch Real-time Vehicles from Database with high-performance caching
   const fetchLiveVehicles = useCallback(async (lat?: number, lng?: number) => {
     try {
       const pLat = lat ?? pickupCoords?.latitude ?? DEFAULT_COORDS.latitude;
       const pLng = lng ?? pickupCoords?.longitude ?? DEFAULT_COORDS.longitude;
-      const res = await apiClient.get('/transport/live-vehicles', {
-        params: { userLat: pLat, userLng: pLng, type: 'passenger' },
-      });
+      const cacheKey = `live-vehicles-${pLat.toFixed(3)}-${pLng.toFixed(3)}`;
+      const cached = queryCache.get<any[]>(cacheKey);
+      if (cached) {
+        setLiveVehicles(cached);
+      }
+      const res = await queryCache.fetchWithDeduplication(cacheKey, () =>
+        apiClient.get('/transport/live-vehicles', {
+          params: { userLat: pLat, userLng: pLng, type: 'passenger' },
+        })
+      );
       if (res.data && Array.isArray(res.data)) {
+        queryCache.set(cacheKey, res.data, 10_000, false);
         setLiveVehicles(res.data);
       }
     } catch (e) {
@@ -1537,7 +1561,7 @@ export default function BookTransportScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <TouchableOpacity
                   activeOpacity={0.75}
-                  onPress={fetchMyRides}
+                  onPress={() => fetchMyRides(true)}
                   disabled={loadingMyRides}
                   style={styles.ridesRefreshBtn}
                   accessibilityLabel="Refresh Rides"

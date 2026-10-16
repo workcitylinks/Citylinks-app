@@ -89,7 +89,7 @@ export const queryCache = {
   invalidate(keyOrPrefix: string): void {
     // 1. Clear from in-memory cache
     for (const key of Array.from(memoryStore.keys())) {
-      if (key.startsWith(keyOrPrefix) || key === keyOrPrefix) {
+      if (key.startsWith(keyOrPrefix) || key === keyOrPrefix || key.includes(keyOrPrefix)) {
         memoryStore.delete(key);
       }
     }

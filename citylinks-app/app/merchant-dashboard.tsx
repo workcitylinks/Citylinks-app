@@ -217,20 +217,44 @@ export default function MerchantDashboardScreen() {
     }
   };
 
-  const fetchMyShop = async () => {
+  const fetchMyShop = async (force = false) => {
+    const shopCacheKey = 'merchant-my-shop';
+    const catCacheKey = 'merchant-shop-categories';
+
+    if (!force) {
+      const cachedShop = queryCache.get<any>(shopCacheKey);
+      const cachedCats = queryCache.get<string[]>(catCacheKey);
+      if (cachedCats && Array.isArray(cachedCats)) {
+        setCategories(cachedCats);
+      }
+      if (cachedShop) {
+        setShop(cachedShop);
+        setProducts(cachedShop.products || []);
+        setEditName(cachedShop.name || '');
+        setEditCategory(cachedShop.category || 'Retail');
+        setEditLocation(cachedShop.location || '');
+        setEditAddress(cachedShop.address || cachedShop.location || '');
+        setEditPhone(cachedShop.phone || '');
+        setEditEmail(cachedShop.email || '');
+      }
+    }
+
     try {
-      setLoading(true);
+      if (!shop && !queryCache.get(shopCacheKey)) setLoading(true);
       const [shopRes, catRes] = await Promise.allSettled([
-        apiClient.get('/shops/my-shop'),
-        apiClient.get('/shops/categories'),
+        queryCache.fetchWithDeduplication(shopCacheKey, () => apiClient.get('/shops/my-shop')),
+        queryCache.fetchWithDeduplication(catCacheKey, () => apiClient.get('/shops/categories')),
       ]);
 
       if (catRes.status === 'fulfilled' && catRes.value.data && Array.isArray(catRes.value.data)) {
-        setCategories(catRes.value.data.filter((c: string) => c !== 'All'));
+        const filteredCats = catRes.value.data.filter((c: string) => c !== 'All');
+        setCategories(filteredCats);
+        queryCache.set(catCacheKey, filteredCats, 300_000, true);
       }
 
       if (shopRes.status === 'fulfilled' && shopRes.value.data?.shop) {
         const s = shopRes.value.data.shop;
+        queryCache.set(shopCacheKey, s, 60_000, true);
         setShop(s);
         setProducts(s.products || []);
         setEditName(s.name || '');
@@ -239,8 +263,8 @@ export default function MerchantDashboardScreen() {
         setEditAddress(s.address || s.location || '');
         setEditPhone(s.phone || '');
         setEditEmail(s.email || '');
-        fetchDeals(s.name);
-      } else if (userData) {
+        fetchDeals(s.name, force);
+      } else if (userData && !shop) {
         // Fallback default storefront based on user profile if initializing
         const defaultName = userData.fullName ? `${userData.fullName}'s Store` : 'My Store';
         setShop({
@@ -414,23 +438,30 @@ export default function MerchantDashboardScreen() {
     });
   };
 
-  const fetchDeals = async (merchantName?: string) => {
+  const fetchDeals = async (merchantName?: string, force = false) => {
+    const targetName = merchantName || shop?.name;
+    const cacheKey = `merchant-deals-${targetName || 'all'}`;
+
+    if (!force) {
+      const cached = queryCache.get<any[]>(cacheKey);
+      if (cached && Array.isArray(cached)) {
+        setMerchantDeals(cached);
+      }
+    }
+
     try {
-      setLoadingDeals(true);
-      const targetName = merchantName || shop?.name;
-      const res = await apiClient.get('/deals', {
-        params: targetName ? { merchantName: targetName } : undefined,
-      });
+      if (merchantDeals.length === 0 && !queryCache.get(cacheKey)) setLoadingDeals(true);
+      const res = await queryCache.fetchWithDeduplication(cacheKey, () =>
+        apiClient.get('/deals', {
+          params: targetName ? { merchantName: targetName } : undefined,
+        })
+      );
       if (Array.isArray(res.data)) {
-        if (targetName) {
-          setMerchantDeals(
-            res.data.filter(
-              (d: any) => d.merchantName?.toLowerCase() === targetName.toLowerCase()
-            )
-          );
-        } else {
-          setMerchantDeals(res.data);
-        }
+        const filtered = targetName
+          ? res.data.filter((d: any) => d.merchantName?.toLowerCase() === targetName.toLowerCase())
+          : res.data;
+        queryCache.set(cacheKey, filtered, 60_000, true);
+        setMerchantDeals(filtered);
       }
     } catch (err) {
       console.warn('Could not fetch merchant deals:', err);
