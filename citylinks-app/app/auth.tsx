@@ -12,8 +12,10 @@ import { registerForPushNotificationsAsync } from "../services/pushNotifications
 import { GoogleLogo } from "../components/ui/GoogleLogo";
 import { startGoogleOAuthFlow, tryAutoDetectAndSaveAddress } from "../services/googleAuth";
 import { getParticularLoggedPage } from "../utils/authRedirect";
+import { useApp } from "../context/AppContext";
 
 const AuthPage = () => {
+  const { refreshAuth } = useApp();
   const params = useLocalSearchParams();
   const [isLogin, setIsLogin] = useState(params.mode !== "signup");
   const [loading, setLoading] = useState(false);
@@ -75,6 +77,7 @@ const AuthPage = () => {
 
           await AsyncStorage.setItem('user_token', token);
           await AsyncStorage.setItem('user_data', JSON.stringify(user));
+          await refreshAuth();
 
           registerForPushNotificationsAsync().catch(() => {});
           if (!user.address) {
@@ -156,6 +159,7 @@ const AuthPage = () => {
           if (response.data.user) {
             await AsyncStorage.setItem('user_data', JSON.stringify(response.data.user));
           }
+          await refreshAuth();
 
           // Register push notification device token for newly authenticated user
           registerForPushNotificationsAsync().catch(() => {});
@@ -213,6 +217,7 @@ const AuthPage = () => {
       const res = await startGoogleOAuthFlow(params.redirect as string);
 
       if (res.success && res.user) {
+        await refreshAuth();
         const name = res.user.fullName || res.user.firstName || "there";
         showSuccess(`Welcome, ${name}!`, "Google Sign-In");
 

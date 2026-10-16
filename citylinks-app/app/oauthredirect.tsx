@@ -7,9 +7,11 @@ import { ShieldCheck } from 'lucide-react-native';
 import { registerForPushNotificationsAsync } from '../services/pushNotifications';
 import { tryAutoDetectAndSaveAddress } from '../services/googleAuth';
 import { getParticularLoggedPage } from '../utils/authRedirect';
+import { useApp } from '../context/AppContext';
 
 export default function OAuthRedirectScreen() {
   const router = useRouter();
+  const { refreshAuth } = useApp();
   const params = useLocalSearchParams();
   const hasHandled = useRef(false);
 
@@ -47,6 +49,7 @@ export default function OAuthRedirectScreen() {
           // Persist credentials
           await AsyncStorage.setItem('user_token', token);
           await AsyncStorage.setItem('user_data', JSON.stringify(user));
+          await refreshAuth();
 
           // Background tasks
           registerForPushNotificationsAsync().catch(() => {});

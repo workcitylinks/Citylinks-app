@@ -122,12 +122,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             await AsyncStorage.setItem('user_data', JSON.stringify(profileRes.data));
           }
         } catch (apiErr: any) {
-          // If server explicitly says user not found or session invalid, clear stale credentials
-          if (apiErr?.response?.status === 401 || apiErr?.response?.status === 404) {
-            console.warn('[AppContext] Stored user does not exist on active server (401/404). Clearing stale session.');
-            await logout();
-            return;
-          }
+          // Keep cached credentials! Never auto-logout on network/transient profile error
+          console.warn('[AppContext] Could not refresh profile, keeping cached session:', apiErr?.message);
         }
 
         // Sync push notification token to newly authenticated user profile
@@ -190,11 +186,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
               setUserData(res.data);
               await AsyncStorage.setItem('user_data', JSON.stringify(res.data));
             }
-          }).catch(async (apiErr: any) => {
-            if (apiErr?.response?.status === 401 || apiErr?.response?.status === 404) {
-              console.warn('[AppContext] Stored user does not exist on active server (401/404). Clearing stale session.');
-              await logout();
-            }
+          }).catch((apiErr: any) => {
+            console.warn('[AppContext] Profile fetch error, keeping cached session:', apiErr?.message);
           });
         }
 
