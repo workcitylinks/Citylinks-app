@@ -330,13 +330,31 @@ router.post('/login', async (req, res) => {
   }
 });
 
+const getGoogleCallbackUrl = (req: any): string => {
+  const host = (req.get('host') || '').toLowerCase();
+
+  // If request came through production domain api.citylinks.in, strictly use HTTPS callback:
+  if (host.includes('api.citylinks.in')) {
+    return 'https://api.citylinks.in/api/auth/google/callback';
+  }
+
+  // If explicitly configured in .env and not an old invalid nip.io URI:
+  if (process.env.GOOGLE_CALLBACK_URL && !process.env.GOOGLE_CALLBACK_URL.includes('nip.io')) {
+    return process.env.GOOGLE_CALLBACK_URL;
+  }
+
+  const forwardedProto = req.headers['x-forwarded-proto'];
+  const protocol = forwardedProto ? String(forwardedProto).split(',')[0].trim() : req.protocol;
+  return `${protocol}://${req.get('host')}/api/auth/google/callback`;
+};
+
 // 1. GET /api/auth/google/start - Initiates real Google OAuth / Account Chooser
 router.get('/google/start', async (req, res) => {
   try {
     const clientRedirectUri = (req.query.redirect_uri as string) || 'citylinksapp://auth';
     const googleClientId = process.env.GOOGLE_CLIENT_ID;
     const serverBase = `${req.protocol}://${req.get('host')}`;
-    const serverCallback = process.env.GOOGLE_CALLBACK_URL || `${serverBase}/api/auth/google/callback`;
+    const serverCallback = getGoogleCallbackUrl(req);
 
     // Encode state for CSRF protection and deep link redirect tracking
     const state = Buffer.from(
@@ -390,7 +408,7 @@ router.get('/google/callback', async (req, res) => {
     }
 
     const serverBase = `${req.protocol}://${req.get('host')}`;
-    const serverCallback = process.env.GOOGLE_CALLBACK_URL || `${serverBase}/api/auth/google/callback`;
+    const serverCallback = getGoogleCallbackUrl(req);
 
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
