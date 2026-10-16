@@ -3,15 +3,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ==============================================================================
 // CITYLINKS API URL CONFIGURATION
-// To switch environments, comment (//) one option and uncomment the other:
+// Controlled by your .env file:
+// - When EXPO_PUBLIC_API_URL is active in .env -> Uses Live Production (https://api.citylinks.in/api)
+// - When EXPO_PUBLIC_API_URL is commented (#) in .env -> Automatically runs on Localhost
 // ==============================================================================
+const LOCAL_FALLBACK_URL = 'http://192.168.0.108:5001/api';
 
-// Option 1: Live Production (Cloudflare + VPS)
-const BASE_URL = 'https://api.citylinks.in/api';
-
-// Option 2: Local Development (Uncomment below to run locally)
-// const BASE_URL = 'http://192.168.0.108:5001/api';
-// const BASE_URL = 'http://localhost:5001/api';
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || LOCAL_FALLBACK_URL;
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
