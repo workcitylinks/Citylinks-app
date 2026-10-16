@@ -8,6 +8,8 @@
     "dev": "nodemon src/server.ts",
     "build": "tsc",
     "seed": "ts-node prisma/seed.ts",
+    "db:export": "ts-node scripts/exportData.ts",
+    "db:import": "ts-node scripts/importData.ts",
     "postinstall": "prisma skills sync || exit 0"
   },
   "prisma": {
