@@ -50,6 +50,14 @@ app.get('/api/health', (req, res) => {
 // Public App Release Endpoint - Checks for latest published version
 app.get('/api/app-release/latest', async (req, res) => {
   try {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "SystemSetting" (
+        "key" TEXT PRIMARY KEY,
+        "value" TEXT NOT NULL,
+        "updatedAt" TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `).catch(() => {});
+
     const row: any = await prisma.$queryRawUnsafe(
       `SELECT "value", "updatedAt" FROM "SystemSetting" WHERE "key" = 'LATEST_APP_RELEASE' LIMIT 1;`
     );
@@ -61,7 +69,7 @@ app.get('/api/app-release/latest', async (req, res) => {
     }
     return res.json({ success: true, release: null });
   } catch (err: any) {
-    return res.status(500).json({ error: 'Failed to fetch latest app release' });
+    return res.json({ success: true, release: null });
   }
 });
 

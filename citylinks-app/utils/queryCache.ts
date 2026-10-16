@@ -111,10 +111,20 @@ export const queryCache = {
   },
 
   /**
-   * Clear all cached query entries
+   * Clear all cached query entries (both in-memory and persistent storage)
    */
-  clear(): void {
+  async clear(): Promise<void> {
     memoryStore.clear();
+    inflightPromises.clear();
+    try {
+      const allKeys = await AsyncStorage.getAllKeys();
+      const cacheKeys = allKeys.filter((k) => k.startsWith(CACHE_STORAGE_PREFIX));
+      if (cacheKeys.length > 0) {
+        await AsyncStorage.multiRemove(cacheKeys);
+      }
+    } catch (e) {
+      // Ignore cleanup error
+    }
   },
 
   /**

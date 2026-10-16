@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { apiClient } from '../api/apiClient';
+import { apiClient, onApiEnvironmentChange } from '../api/apiClient';
 import { queryCache } from '../utils/queryCache';
 
 export interface UseApiQueryOptions<T> {
@@ -43,9 +43,10 @@ export function useApiQuery<T = any>(
     onError,
   } = options;
 
-  // Build unique cache key based on endpoint and normalized params
+  // Scope cache key by active server URL so production and local caches never collide
   const serializedParams = params ? JSON.stringify(params) : '';
-  const cacheKey = endpoint ? `${endpoint}:${serializedParams}` : '';
+  const activeBase = apiClient.defaults.baseURL || 'default';
+  const cacheKey = endpoint ? `${activeBase}::${endpoint}:${serializedParams}` : '';
 
   // Synchronously initialize from in-memory cache if available
   const cachedInitial = cacheKey ? queryCache.get<T>(cacheKey) : null;
@@ -78,47 +79,45 @@ export function useApiQuery<T = any>(
       if (!endpoint || !enabled) return null;
 
       const force = opts?.force ?? false;
+      let hasCachedData = false;
 
-      // 1. Check in-memory cache unless forced
+      // 1. Immediately show cached data for this active server if available (0ms render)
       if (!force) {
         const memCached = queryCache.get<T>(cacheKey);
         if (memCached !== null) {
+          hasCachedData = true;
           if (isMountedRef.current) {
             setData(memCached);
             setLoading(false);
-            setRefreshing(false);
           }
-          return memCached;
-        }
-
-        // 2. Check persistent cache if enabled
-        if (persist) {
+        } else if (persist) {
           const persCached = await queryCache.getPersistent<T>(cacheKey);
           if (persCached !== null) {
+            hasCachedData = true;
             if (isMountedRef.current) {
               setData(persCached);
               setLoading(false);
-              setRefreshing(false);
             }
-            return persCached;
           }
         }
       }
 
-      // 3. Perform backend request with in-flight deduplication
-      try {
-        if (force) {
-          setRefreshing(true);
-        } else if (!dataRef.current) {
-          setLoading(true);
-        }
+      // If we don't have cached data yet, show initial loading spinner
+      if (!hasCachedData && !dataRef.current) {
+        if (isMountedRef.current) setLoading(true);
+      }
+      if (force && isMountedRef.current) {
+        setRefreshing(true);
+      }
 
+      // 2. ALWAYS fetch live from the active backend (Stale-While-Revalidate)
+      try {
         const result = await queryCache.fetchWithDeduplication(cacheKey, async () => {
           const res = await apiClient.get<T>(endpoint, { params: paramsRef.current });
           return res.data;
         });
 
-        // Store in cache
+        // Store in cache for this server
         queryCache.set(cacheKey, result, ttlMs, persist);
 
         if (isMountedRef.current) {
@@ -143,19 +142,23 @@ export function useApiQuery<T = any>(
     [endpoint, enabled, cacheKey, ttlMs, persist]
   );
 
+  // Initial fetch
   useEffect(() => {
     if (!enabled || !endpoint) return;
-
-    // Check if we already have cache for this key
-    const memCached = queryCache.get<T>(cacheKey);
-    if (memCached !== null) {
-      setData(memCached);
-      setLoading(false);
-      return;
-    }
-
     fetchData();
-  }, [cacheKey, enabled, endpoint]);
+  }, [cacheKey, enabled, endpoint, fetchData]);
+
+  // Instantly re-fetch when the active API environment switches
+  useEffect(() => {
+    const unsubscribe = onApiEnvironmentChange(() => {
+      if (isMountedRef.current && enabled) {
+        fetchData({ force: true });
+      }
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, [fetchData, enabled]);
 
   const mutate = useCallback(
     (newData: T | ((prev: T | null) => T), opts?: { revalidate?: boolean }) => {

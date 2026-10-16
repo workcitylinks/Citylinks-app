@@ -29,8 +29,10 @@ import {
   Lock,
   ChevronRight,
   Crosshair,
+  Server,
+  RefreshCw,
 } from 'lucide-react-native';
-import { apiClient } from '../api/apiClient';
+import { apiClient, getActiveApiEnvironment, switchApiEnvironment, ApiEnvironment } from '../api/apiClient';
 import { useToast } from '../context/ToastContext';
 import { useApp } from '../context/AppContext';
 import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
@@ -41,6 +43,8 @@ export default function ProfileScreen() {
   const { showSuccess, showError } = useToast();
   const { switchUserRole, refreshAuth: refreshAppAuth } = useApp();
   const [fetchingLocation, setFetchingLocation] = useState(false);
+  const [activeEnv, setActiveEnv] = useState<ApiEnvironment>(getActiveApiEnvironment());
+  const [switchingEnv, setSwitchingEnv] = useState(false);
   const { 
     profile, 
     loading, 
@@ -436,6 +440,92 @@ export default function ProfileScreen() {
                 {maskPan(profile?.panNumber ?? null)}
               </Text>
             </View>
+          </View>
+
+          {/* Card: API Server & Database Switcher */}
+          <View className="bg-white rounded-3xl p-5 mb-4 shadow-sm border border-slate-100">
+            <View className="flex-row items-center justify-between mb-3">
+              <View className="flex-row items-center">
+                <Server size={18} color="#7c3aed" />
+                <Text className="text-base font-bold text-slate-900 ml-2">
+                  Active Server & Database
+                </Text>
+              </View>
+              <View
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                  borderRadius: 20,
+                  backgroundColor: activeEnv === 'production' ? '#ecfdf5' : '#fef3c7',
+                  borderColor: activeEnv === 'production' ? '#a7f3d0' : '#fde68a',
+                  borderWidth: 1,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: '800',
+                    color: activeEnv === 'production' ? '#059669' : '#d97706',
+                  }}
+                >
+                  {activeEnv === 'production' ? '● PRODUCTION' : '● LOCALHOST'}
+                </Text>
+              </View>
+            </View>
+
+            <Text className="text-xs text-slate-500 mb-3 leading-4">
+              Connected: <Text style={{ fontWeight: '700', color: '#334155' }}>{apiClient.defaults.baseURL}</Text>
+            </Text>
+
+            <TouchableOpacity
+              activeOpacity={0.8}
+              disabled={switchingEnv}
+              onPress={async () => {
+                try {
+                  setSwitchingEnv(true);
+                  const target: ApiEnvironment = activeEnv === 'production' ? 'local' : 'production';
+                  const newUrl = await switchApiEnvironment(target);
+                  setActiveEnv(target);
+                  showSuccess(`Switched instantly to ${target.toUpperCase()} (${newUrl})! Fresh data loaded.`, 'Server Switched');
+                  refetch({ force: true });
+                } catch (err: any) {
+                  showError(err.message || 'Failed to switch server', 'Error');
+                } finally {
+                  setSwitchingEnv(false);
+                }
+              }}
+              style={{
+                paddingVertical: 12,
+                paddingHorizontal: 16,
+                borderRadius: 14,
+                backgroundColor: activeEnv === 'production' ? '#f5f3ff' : '#eff6ff',
+                borderColor: activeEnv === 'production' ? '#c4b5fd' : '#bfdbfe',
+                borderWidth: 1.5,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+              }}
+            >
+              {switchingEnv ? (
+                <ActivityIndicator size="small" color="#7c3aed" />
+              ) : (
+                <>
+                  <RefreshCw size={15} color={activeEnv === 'production' ? '#7c3aed' : '#2563eb'} />
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: '800',
+                      color: activeEnv === 'production' ? '#7c3aed' : '#2563eb',
+                    }}
+                  >
+                    {activeEnv === 'production'
+                      ? '⚡ Tap to Switch to Localhost Database'
+                      : '⚡ Tap to Switch to Live Production Database'}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
 
           {/* Card 4: Security & Password */}
