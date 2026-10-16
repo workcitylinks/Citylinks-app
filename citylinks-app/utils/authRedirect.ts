@@ -1,39 +1,41 @@
 /**
  * authRedirect.ts
- * Determines the exact particular logged-in screen where the user must be redirected.
+ * Determines the exact screen where the user must be redirected upon login.
  *
- * Rules:
- * 1. If an explicit redirect param is provided (e.g. from /cart, /book-transport, /services, etc.),
- *    return that screen path immediately.
- * 2. Otherwise, route the user to their specific dedicated role dashboard:
- *    - SUPER_ADMIN -> /admin-approvals
- *    - MERCHANT -> /merchant-dashboard
- *    - TRANSPORT -> /transport-dashboard
- *    - MANUAL_SERVICE_PROVIDER -> /manual-service-dashboard
- *    - DIGITAL_SERVICE_PROVIDER -> /digital-service-dashboard
- *    - CUSTOMER -> / (Home)
+ * Requirements:
+ * Always open the main home page ('/') for all users regardless of their role
+ * (Merchant, Driver/Transport, Technical/Manual Service, Digital Specialist,
+ * Super Admin, Customer).
+ *
+ * Only redirects to a specific screen if the user had an active in-flow intent
+ * (e.g. they were in /cart or /orders and had to log in to complete their action).
  */
-export function getParticularLoggedPage(user: any, redirectParam?: string | string[] | null): string {
+export function getParticularLoggedPage(user?: any, redirectParam?: string | string[] | null): string {
   const targetParam = Array.isArray(redirectParam) ? redirectParam[0] : redirectParam;
-  if (targetParam && typeof targetParam === 'string' && targetParam.startsWith('/') && targetParam !== '/auth') {
+
+  // Never automatically redirect into internal role dashboards or auth screens on login
+  const DISALLOWED_DEFAULT_ROUTES = [
+    '/auth',
+    '/oauthredirect',
+    '/merchant-dashboard',
+    '/transport-dashboard',
+    '/manual-service-dashboard',
+    '/digital-service-dashboard',
+    '/admin-approvals',
+    '/admin-deals',
+    '/admin-sponsored',
+    '/admin-notification',
+  ];
+
+  if (
+    targetParam &&
+    typeof targetParam === 'string' &&
+    targetParam.startsWith('/') &&
+    !DISALLOWED_DEFAULT_ROUTES.includes(targetParam)
+  ) {
     return targetParam;
   }
 
-  const role = String(user?.role || '').toUpperCase().trim();
-
-  switch (role) {
-    case 'SUPER_ADMIN':
-      return '/'; // Super Admin lands directly on the Home page
-    case 'MERCHANT':
-      return '/merchant-dashboard';
-    case 'TRANSPORT':
-      return '/transport-dashboard';
-    case 'MANUAL_SERVICE_PROVIDER':
-      return '/manual-service-dashboard';
-    case 'DIGITAL_SERVICE_PROVIDER':
-      return '/digital-service-dashboard';
-    case 'CUSTOMER':
-    default:
-      return '/';
-  }
+  // Always open the main home page ('/') for all roles
+  return '/';
 }
