@@ -2084,6 +2084,7 @@ export default function BookTransportScreen() {
               style={styles.modalInputField}
               placeholder="Search city (e.g. Haveri, Bengaluru)..."
               placeholderTextColor="#94a3b8"
+              maxLength={60}
               value={citySearchQuery}
               onChangeText={setCitySearchQuery}
             />
@@ -2135,6 +2136,7 @@ export default function BookTransportScreen() {
               style={styles.modalInputField}
               placeholder="Label (e.g. Airport, University)"
               placeholderTextColor="#94a3b8"
+              maxLength={40}
               value={newPlaceName}
               onChangeText={setNewPlaceName}
             />
@@ -2143,6 +2145,7 @@ export default function BookTransportScreen() {
               style={styles.modalInputField}
               placeholder="Address / Street Name"
               placeholderTextColor="#94a3b8"
+              maxLength={120}
               value={newPlaceAddress}
               onChangeText={setNewPlaceAddress}
             />

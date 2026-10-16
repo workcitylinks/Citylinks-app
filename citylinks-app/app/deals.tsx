@@ -100,6 +100,7 @@ export default function DealsScreen() {
             <TextInput
               placeholder="Search deals, merchants, discounts..."
               placeholderTextColor="#94a3b8"
+              maxLength={60}
               value={searchQuery}
               onChangeText={setSearchQuery}
               className="flex-1 ml-2.5 text-slate-800 text-sm font-normal"

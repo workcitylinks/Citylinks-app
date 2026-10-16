@@ -323,6 +323,7 @@ const AuthPage = () => {
                       value={fullName}
                       onChangeText={setFullName}
                       placeholder="John Doe"
+                      maxLength={50}
                       className="flex-1 ml-2 text-foreground"
                       placeholderTextColor="#64748b"
                       returnKeyType="next"
@@ -345,6 +346,7 @@ const AuthPage = () => {
                       lastAttemptedCreds.current = ""; // Reset attempt on change
                     }}
                     placeholder="you@example.com"
+                    maxLength={60}
                     autoCapitalize="none"
                     autoCorrect={false}
                     keyboardType="email-address"
@@ -377,6 +379,7 @@ const AuthPage = () => {
                       lastAttemptedCreds.current = ""; // Reset attempt on change
                     }}
                     placeholder="••••••••"
+                    maxLength={32}
                     secureTextEntry={!showPassword}
                     returnKeyType="go"
                     onSubmitEditing={() => handleAuth(false)}

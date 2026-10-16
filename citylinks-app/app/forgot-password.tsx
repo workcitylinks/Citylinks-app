@@ -139,6 +139,7 @@ const ForgotPasswordPage = () => {
                     value={email}
                     onChangeText={setEmail}
                     placeholder="you@example.com"
+                    maxLength={60}
                     autoCapitalize="none"
                     autoCorrect={false}
                     keyboardType="email-address"

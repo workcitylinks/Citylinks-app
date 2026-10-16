@@ -1314,6 +1314,7 @@ export default function DigitalServiceDashboardScreen() {
                   <TextInput
                     value={serviceTitle}
                     onChangeText={setServiceTitle}
+                    maxLength={60}
                     placeholder="e.g. Modern Business Website & Online Store"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600' }}
@@ -1348,6 +1349,7 @@ export default function DigitalServiceDashboardScreen() {
                   <TextInput
                     value={serviceDomain}
                     onChangeText={setServiceDomain}
+                    maxLength={40}
                     placeholder="Or type custom digital domain"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, padding: 10, fontSize: 12 }}
@@ -1362,6 +1364,7 @@ export default function DigitalServiceDashboardScreen() {
                   <TextInput
                     value={servicePriceLabel}
                     onChangeText={setServicePriceLabel}
+                    maxLength={30}
                     placeholder="e.g. ₹2,999 onwards / ₹499 per post"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '700', color: '#7c3aed', marginBottom: 6 }}
@@ -1396,6 +1399,7 @@ export default function DigitalServiceDashboardScreen() {
                   <TextInput
                     value={servicePhone}
                     onChangeText={setServicePhone}
+                    maxLength={14}
                     keyboardType="phone-pad"
                     placeholder="Phone number for client inquiries"
                     placeholderTextColor="#94a3b8"
@@ -1411,6 +1415,7 @@ export default function DigitalServiceDashboardScreen() {
                   <TextInput
                     value={serviceLocation}
                     onChangeText={setServiceLocation}
+                    maxLength={80}
                     placeholder="Online & Haveri Region"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600' }}
@@ -1452,6 +1457,7 @@ export default function DigitalServiceDashboardScreen() {
                   <TextInput
                     value={serviceDescription}
                     onChangeText={setServiceDescription}
+                    maxLength={300}
                     multiline
                     numberOfLines={3}
                     placeholder="Describe technologies, revisions, deliverables..."
@@ -1592,6 +1598,7 @@ export default function DigitalServiceDashboardScreen() {
                   <TextInput
                     value={dealTitle}
                     onChangeText={setDealTitle}
+                    maxLength={60}
                     placeholder="e.g. Flat 25% Off on Business Website & Hosting Package"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600' }}
@@ -1605,6 +1612,7 @@ export default function DigitalServiceDashboardScreen() {
                   <TextInput
                     value={dealDiscount}
                     onChangeText={setDealDiscount}
+                    maxLength={30}
                     placeholder="e.g. 25% OFF, FLAT ₹500 OFF"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '700', color: '#d97706', marginBottom: 6 }}
@@ -1638,6 +1646,7 @@ export default function DigitalServiceDashboardScreen() {
                   <TextInput
                     value={dealValidUntil}
                     onChangeText={setDealValidUntil}
+                    maxLength={40}
                     placeholder="Valid this month / Limited slots"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600' }}
@@ -1699,6 +1708,7 @@ export default function DigitalServiceDashboardScreen() {
                   <TextInput
                     value={editName}
                     onChangeText={setEditName}
+                    maxLength={50}
                     placeholder="e.g. PixelCraft Digital Studio"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600' }}
@@ -1712,6 +1722,7 @@ export default function DigitalServiceDashboardScreen() {
                   <TextInput
                     value={editDomain}
                     onChangeText={setEditDomain}
+                    maxLength={40}
                     placeholder="e.g. Website Creation, Graphic Design"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600' }}
@@ -1725,6 +1736,7 @@ export default function DigitalServiceDashboardScreen() {
                   <TextInput
                     value={editPhone}
                     onChangeText={setEditPhone}
+                    maxLength={14}
                     keyboardType="phone-pad"
                     placeholder="Phone number"
                     placeholderTextColor="#94a3b8"
@@ -1751,6 +1763,7 @@ export default function DigitalServiceDashboardScreen() {
                   <TextInput
                     value={editLocation}
                     onChangeText={setEditLocation}
+                    maxLength={80}
                     placeholder="Haveri Region & Online"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600' }}

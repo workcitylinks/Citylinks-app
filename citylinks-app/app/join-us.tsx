@@ -1172,6 +1172,7 @@ export default function JoinUsScreen() {
                 <TextInput
                   value={shopName}
                   onChangeText={setShopName}
+                  maxLength={60}
                   placeholder={
                     selectedRole === 'TRANSPORT'
                       ? 'e.g. Karthik R. / Rajesh Transport'
@@ -1331,6 +1332,7 @@ export default function JoinUsScreen() {
                       <TextInput
                         value={customCategory}
                         onChangeText={setCustomCategory}
+                        maxLength={40}
                         placeholder="e.g. Pet Care, Handicrafts, Sweet Stall, Furniture"
                         placeholderTextColor="#94a3b8"
                         className="flex-1 text-sm text-slate-800"
@@ -1384,6 +1386,7 @@ export default function JoinUsScreen() {
                       <TextInput
                         value={customManualService}
                         onChangeText={setCustomManualService}
+                        maxLength={50}
                         placeholder="e.g. Mason, painter, borewell technician, glass fitter"
                         placeholderTextColor="#94a3b8"
                         className="flex-1 text-sm text-slate-800"
@@ -1433,6 +1436,7 @@ export default function JoinUsScreen() {
                       <TextInput
                         value={customService}
                         onChangeText={setCustomService}
+                        maxLength={50}
                         placeholder="e.g. App development, video editing, software solutions"
                         placeholderTextColor="#94a3b8"
                         className="flex-1 text-sm text-slate-800"
@@ -1475,6 +1479,7 @@ export default function JoinUsScreen() {
                       <TextInput
                         value={transportLicense}
                         onChangeText={setTransportLicense}
+                        maxLength={20}
                         placeholder="e.g. KA27 20210008459"
                         placeholderTextColor="#94a3b8"
                         autoCapitalize="characters"
@@ -1561,6 +1566,7 @@ export default function JoinUsScreen() {
                       <TextInput
                         value={transportAadhaar}
                         onChangeText={setTransportAadhaar}
+                        maxLength={14}
                         placeholder="e.g. 5489 1234 5678"
                         placeholderTextColor="#94a3b8"
                         keyboardType="numeric"
@@ -1743,6 +1749,7 @@ export default function JoinUsScreen() {
                           <TextInput
                             value={v1CustomType}
                             onChangeText={setV1CustomType}
+                            maxLength={30}
                             placeholder="e.g. Mini Bus, Force Traveller, Electric Buggy"
                             placeholderTextColor="#94a3b8"
                             className="bg-white rounded-lg px-3 py-2 text-xs text-slate-800 border border-blue-200"
@@ -1760,6 +1767,7 @@ export default function JoinUsScreen() {
                         <TextInput
                           value={v1Model}
                           onChangeText={setV1Model}
+                          maxLength={50}
                           placeholder="e.g. White Toyota Corolla / Yellow Bajaj RE Auto"
                           placeholderTextColor="#94a3b8"
                           className="text-sm text-slate-800"
@@ -1794,6 +1802,7 @@ export default function JoinUsScreen() {
                         <TextInput
                           value={v1Plate}
                           onChangeText={setV1Plate}
+                          maxLength={15}
                           placeholder="__ __ _ ____"
                           placeholderTextColor="#854d0e"
                           autoCapitalize="characters"
@@ -1818,6 +1827,7 @@ export default function JoinUsScreen() {
                           <TextInput
                             value={v1RatePerKm}
                             onChangeText={setV1RatePerKm}
+                            maxLength={8}
                             keyboardType="numeric"
                             placeholder="20"
                             placeholderTextColor="#94a3b8"
@@ -1834,6 +1844,7 @@ export default function JoinUsScreen() {
                           <TextInput
                             value={v1BaseFare}
                             onChangeText={setV1BaseFare}
+                            maxLength={8}
                             keyboardType="numeric"
                             placeholder="30"
                             placeholderTextColor="#94a3b8"
@@ -1915,6 +1926,7 @@ export default function JoinUsScreen() {
                             <TextInput
                               value={v2CustomType}
                               onChangeText={setV2CustomType}
+                              maxLength={30}
                               placeholder="e.g. Mini Bus, Force Traveller, Buggy"
                               placeholderTextColor="#94a3b8"
                               className="bg-white rounded-lg px-3 py-2 text-xs text-slate-800 border border-blue-200"
@@ -1932,6 +1944,7 @@ export default function JoinUsScreen() {
                           <TextInput
                             value={v2Model}
                             onChangeText={setV2Model}
+                            maxLength={50}
                             placeholder="e.g. Yellow Bajaj Maxima Auto / Maruti Swift"
                             placeholderTextColor="#94a3b8"
                             className="text-sm text-slate-800"
@@ -1966,6 +1979,7 @@ export default function JoinUsScreen() {
                           <TextInput
                             value={v2Plate}
                             onChangeText={setV2Plate}
+                            maxLength={15}
                             placeholder="KA 27 B 1234"
                             placeholderTextColor="#854d0e"
                             autoCapitalize="characters"
@@ -1990,6 +2004,7 @@ export default function JoinUsScreen() {
                             <TextInput
                               value={v2RatePerKm}
                               onChangeText={setV2RatePerKm}
+                              maxLength={8}
                               keyboardType="numeric"
                               placeholder="20"
                               placeholderTextColor="#94a3b8"
@@ -2006,6 +2021,7 @@ export default function JoinUsScreen() {
                             <TextInput
                               value={v2BaseFare}
                               onChangeText={setV2BaseFare}
+                              maxLength={8}
                               keyboardType="numeric"
                               placeholder="30"
                               placeholderTextColor="#94a3b8"
@@ -2111,6 +2127,7 @@ export default function JoinUsScreen() {
                             <TextInput
                               value={v3CustomType}
                               onChangeText={setV3CustomType}
+                              maxLength={30}
                               placeholder="e.g. Mini Bus, Force Traveller"
                               placeholderTextColor="#94a3b8"
                               className="bg-white rounded-lg px-3 py-2 text-xs text-slate-800 border border-blue-200"
@@ -2128,6 +2145,7 @@ export default function JoinUsScreen() {
                           <TextInput
                             value={v3Model}
                             onChangeText={setV3Model}
+                            maxLength={50}
                             placeholder="e.g. White Mahindra Treo / Blue Tata Ace"
                             placeholderTextColor="#94a3b8"
                             className="text-sm text-slate-800"
@@ -2162,6 +2180,7 @@ export default function JoinUsScreen() {
                           <TextInput
                             value={v3Plate}
                             onChangeText={setV3Plate}
+                            maxLength={15}
                             placeholder="KA 27 E 9988"
                             placeholderTextColor="#854d0e"
                             autoCapitalize="characters"
@@ -2186,6 +2205,7 @@ export default function JoinUsScreen() {
                             <TextInput
                               value={v3RatePerKm}
                               onChangeText={setV3RatePerKm}
+                              maxLength={8}
                               keyboardType="numeric"
                               placeholder="20"
                               placeholderTextColor="#94a3b8"
@@ -2202,6 +2222,7 @@ export default function JoinUsScreen() {
                             <TextInput
                               value={v3BaseFare}
                               onChangeText={setV3BaseFare}
+                              maxLength={8}
                               keyboardType="numeric"
                               placeholder="30"
                               placeholderTextColor="#94a3b8"
@@ -2261,6 +2282,7 @@ export default function JoinUsScreen() {
                   <TextInput
                     value={description}
                     onChangeText={setDescription}
+                    maxLength={350}
                     placeholder="Tell customers and the admin about what your shop sells or the services you provide..."
                     placeholderTextColor="#94a3b8"
                     multiline
@@ -2311,6 +2333,7 @@ export default function JoinUsScreen() {
                 <TextInput
                   value={location}
                   onChangeText={setLocation}
+                  maxLength={120}
                   placeholder={
                     selectedRole === 'TRANSPORT'
                       ? 'e.g. Haveri Town, Near Old Bus Stand, Karnataka'
@@ -2335,6 +2358,7 @@ export default function JoinUsScreen() {
                 <TextInput
                   value={phone}
                   onChangeText={setPhone}
+                  maxLength={14}
                   placeholder="e.g. 9845123456"
                   keyboardType="phone-pad"
                   placeholderTextColor="#94a3b8"
@@ -2353,6 +2377,7 @@ export default function JoinUsScreen() {
                 <TextInput
                   value={email}
                   onChangeText={setEmail}
+                  maxLength={60}
                   placeholder="e.g. contact@myshop.com"
                   keyboardType="email-address"
                   autoCapitalize="none"

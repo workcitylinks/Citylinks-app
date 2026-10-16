@@ -298,6 +298,7 @@ export default function CompleteProfileScreen() {
               </Text>
               <TextInput
                 placeholder="Enter your first name"
+                maxLength={35}
                 value={firstName}
                 onChangeText={setFirstName}
                 className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-slate-800 text-sm"
@@ -311,6 +312,7 @@ export default function CompleteProfileScreen() {
               </Text>
               <TextInput
                 placeholder="Enter your last name"
+                maxLength={35}
                 value={lastName}
                 onChangeText={setLastName}
                 className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-slate-800 text-sm"
@@ -325,6 +327,7 @@ export default function CompleteProfileScreen() {
               <TextInput
                 placeholder="e.g. +91 9876543210"
                 keyboardType="phone-pad"
+                maxLength={14}
                 value={phone}
                 onChangeText={setPhone}
                 className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-slate-800 text-sm"
@@ -392,6 +395,7 @@ export default function CompleteProfileScreen() {
                   placeholderTextColor="#94a3b8"
                   multiline
                   numberOfLines={2}
+                  maxLength={150}
                   value={address}
                   onChangeText={setAddress}
                   className="flex-1 text-slate-800 text-sm p-0 leading-5"

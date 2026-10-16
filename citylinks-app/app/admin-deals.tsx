@@ -349,6 +349,7 @@ export default function AdminDealsScreen() {
             <TextInput
               value={searchQuery}
               onChangeText={setSearchQuery}
+              maxLength={60}
               placeholder="Search deals, merchants, discount tags..."
               placeholderTextColor="#94a3b8"
               style={{ flex: 1, marginLeft: 8, fontSize: 13, color: '#0f172a' }}
@@ -763,6 +764,7 @@ export default function AdminDealsScreen() {
                   <TextInput
                     value={dealTitle}
                     onChangeText={setDealTitle}
+                    maxLength={60}
                     placeholder="e.g. 50% Off First Home Deep Cleaning Service"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600' }}
@@ -777,6 +779,7 @@ export default function AdminDealsScreen() {
                   <TextInput
                     value={dealMerchant}
                     onChangeText={setDealMerchant}
+                    maxLength={50}
                     placeholder="e.g. Renuka Appliances, CityLinks Special"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600' }}
@@ -791,6 +794,7 @@ export default function AdminDealsScreen() {
                   <TextInput
                     value={dealDiscount}
                     onChangeText={setDealDiscount}
+                    maxLength={30}
                     placeholder="e.g. 30% OFF, BOGO FREE, FLAT ₹50 OFF"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '700', color: '#d97706', marginBottom: 6 }}
@@ -825,6 +829,7 @@ export default function AdminDealsScreen() {
                   <TextInput
                     value={dealCategory}
                     onChangeText={setDealCategory}
+                    maxLength={30}
                     placeholder="e.g. Shopping, Services, Electronics"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600', marginBottom: 6 }}
@@ -859,6 +864,7 @@ export default function AdminDealsScreen() {
                   <TextInput
                     value={dealValidUntil}
                     onChangeText={setDealValidUntil}
+                    maxLength={40}
                     placeholder="e.g. Valid till Sunday / Limited time offer"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600', marginBottom: 6 }}
@@ -893,6 +899,7 @@ export default function AdminDealsScreen() {
                   <TextInput
                     value={dealLinkUrl}
                     onChangeText={setDealLinkUrl}
+                    maxLength={120}
                     placeholder="/deals, /shops, /services"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600' }}

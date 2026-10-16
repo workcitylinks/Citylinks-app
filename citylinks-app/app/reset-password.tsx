@@ -159,6 +159,7 @@ const ResetPasswordPage = () => {
                     value={password}
                     onChangeText={setPassword}
                     placeholder="At least 6 characters"
+                    maxLength={32}
                     secureTextEntry={!showPassword}
                     returnKeyType="next"
                     className="flex-1 ml-2 text-foreground"
@@ -185,6 +186,7 @@ const ResetPasswordPage = () => {
                     value={confirmPassword}
                     onChangeText={setConfirmPassword}
                     placeholder="Re-enter password"
+                    maxLength={32}
                     secureTextEntry={!showConfirmPassword}
                     returnKeyType="go"
                     onSubmitEditing={handleResetPassword}

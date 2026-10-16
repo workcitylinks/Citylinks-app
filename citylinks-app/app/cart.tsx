@@ -969,6 +969,7 @@ export default function CartScreen() {
                   <TextInput
                     value={customAddressInput}
                     onChangeText={setCustomAddressInput}
+                    maxLength={120}
                     placeholder="e.g. Shivaji Nagar, Near Bus Stand, Haveri"
                     placeholderTextColor="#94a3b8"
                     className="flex-1 text-xs text-slate-800 ml-2"

@@ -379,6 +379,7 @@ export default function AdminSponsoredScreen() {
           <Search size={16} color="#94a3b8" />
           <TextInput
             style={styles.searchInput}
+            maxLength={60}
             placeholder={
               activeTab === 'shops'
                 ? 'Search shop name, category, location...'

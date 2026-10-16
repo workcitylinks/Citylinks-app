@@ -1472,6 +1472,7 @@ export default function TransportDashboardScreen() {
                   setRideSearchQuery(val);
                   setRideHistoryPage(1);
                 }}
+                maxLength={60}
                 placeholder="Search by passenger, route, or km (e.g. 85.2)..."
                 placeholderTextColor="#94a3b8"
                 className="flex-1 text-xs text-slate-900 font-semibold py-1"
@@ -2079,6 +2080,7 @@ export default function TransportDashboardScreen() {
                   <TextInput
                     value={vOtherType}
                     onChangeText={setVOtherType}
+                    maxLength={30}
                     placeholder="e.g. Minibus, E-Rickshaw, Pickup Van, Electric Loader"
                     placeholderTextColor="#94a3b8"
                     className="bg-white border border-blue-300 rounded-xl px-3.5 py-2.5 text-slate-900 text-sm font-semibold"
@@ -2094,6 +2096,7 @@ export default function TransportDashboardScreen() {
                 <TextInput
                   value={vModel}
                   onChangeText={setVModel}
+                  maxLength={50}
                   placeholder="e.g. White Toyota Corolla / Yellow-Black Bajaj RE Auto"
                   placeholderTextColor="#94a3b8"
                   className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-slate-900 text-sm font-medium"
@@ -2112,6 +2115,7 @@ export default function TransportDashboardScreen() {
                   <TextInput
                     value={vPlate}
                     onChangeText={setVPlate}
+                    maxLength={15}
                     placeholder="KA 27 M 4589"
                     placeholderTextColor="#a16207"
                     autoCapitalize="characters"
@@ -2130,6 +2134,7 @@ export default function TransportDashboardScreen() {
                   <TextInput
                     value={vRatePerKm}
                     onChangeText={setVRatePerKm}
+                    maxLength={8}
                     keyboardType="numeric"
                     placeholder="20"
                     placeholderTextColor="#94a3b8"
@@ -2142,6 +2147,7 @@ export default function TransportDashboardScreen() {
                   <TextInput
                     value={vBaseFare}
                     onChangeText={setVBaseFare}
+                    maxLength={8}
                     keyboardType="numeric"
                     placeholder="30"
                     placeholderTextColor="#94a3b8"
@@ -2223,6 +2229,7 @@ export default function TransportDashboardScreen() {
                 <TextInput
                   value={editName}
                   onChangeText={setEditName}
+                  maxLength={50}
                   placeholder="e.g. Karthik R."
                   placeholderTextColor="#94a3b8"
                   className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-slate-900 text-sm"
@@ -2235,6 +2242,7 @@ export default function TransportDashboardScreen() {
                 <TextInput
                   value={editPhone}
                   onChangeText={setEditPhone}
+                  maxLength={14}
                   keyboardType="phone-pad"
                   placeholder="e.g. 9876543210"
                   placeholderTextColor="#94a3b8"
@@ -2248,6 +2256,7 @@ export default function TransportDashboardScreen() {
                 <TextInput
                   value={editLicense}
                   onChangeText={setEditLicense}
+                  maxLength={20}
                   placeholder="e.g. KA27 20210008459"
                   placeholderTextColor="#94a3b8"
                   autoCapitalize="characters"
@@ -2311,6 +2320,7 @@ export default function TransportDashboardScreen() {
                 <TextInput
                   value={editAadhaar}
                   onChangeText={setEditAadhaar}
+                  maxLength={14}
                   keyboardType="numeric"
                   placeholder="e.g. 5489 1234 5678"
                   placeholderTextColor="#94a3b8"
@@ -2388,6 +2398,7 @@ export default function TransportDashboardScreen() {
                 <TextInput
                   value={editLocation}
                   onChangeText={setEditLocation}
+                  maxLength={80}
                   placeholder="e.g. Haveri Town, Karnataka"
                   placeholderTextColor="#94a3b8"
                   className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-slate-900 text-sm"
@@ -2400,6 +2411,7 @@ export default function TransportDashboardScreen() {
                 <TextInput
                   value={editEmergency}
                   onChangeText={setEditEmergency}
+                  maxLength={14}
                   keyboardType="phone-pad"
                   placeholder="e.g. 9845112233"
                   placeholderTextColor="#94a3b8"
@@ -2414,6 +2426,7 @@ export default function TransportDashboardScreen() {
                   <TextInput
                     value={editRatePerKm}
                     onChangeText={setEditRatePerKm}
+                    maxLength={8}
                     keyboardType="numeric"
                     placeholder="20"
                     className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-slate-900 font-bold text-sm"
@@ -2424,6 +2437,7 @@ export default function TransportDashboardScreen() {
                   <TextInput
                     value={editBaseFare}
                     onChangeText={setEditBaseFare}
+                    maxLength={8}
                     keyboardType="numeric"
                     placeholder="30"
                     className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-slate-900 font-bold text-sm"

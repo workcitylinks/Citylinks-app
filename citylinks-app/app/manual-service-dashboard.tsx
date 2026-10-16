@@ -1298,6 +1298,7 @@ export default function ManualServiceDashboardScreen() {
                   <TextInput
                     value={serviceTitle}
                     onChangeText={setServiceTitle}
+                    maxLength={60}
                     placeholder="e.g. Complete Bathroom & Pipe Leakage Repair"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600' }}
@@ -1332,6 +1333,7 @@ export default function ManualServiceDashboardScreen() {
                   <TextInput
                     value={serviceCategory}
                     onChangeText={setServiceCategory}
+                    maxLength={40}
                     placeholder="Or type custom trade category"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, padding: 10, fontSize: 12 }}
@@ -1346,6 +1348,7 @@ export default function ManualServiceDashboardScreen() {
                   <TextInput
                     value={servicePriceLabel}
                     onChangeText={setServicePriceLabel}
+                    maxLength={30}
                     placeholder="e.g. ₹249 onwards / ₹150/hr"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '700', color: '#16a34a', marginBottom: 6 }}
@@ -1380,6 +1383,7 @@ export default function ManualServiceDashboardScreen() {
                   <TextInput
                     value={servicePhone}
                     onChangeText={setServicePhone}
+                    maxLength={14}
                     keyboardType="phone-pad"
                     placeholder="Phone number for customer calls"
                     placeholderTextColor="#94a3b8"
@@ -1395,6 +1399,7 @@ export default function ManualServiceDashboardScreen() {
                   <TextInput
                     value={serviceLocation}
                     onChangeText={setServiceLocation}
+                    maxLength={80}
                     placeholder="Haveri Town / Haveri Region"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600' }}
@@ -1409,6 +1414,7 @@ export default function ManualServiceDashboardScreen() {
                   <TextInput
                     value={serviceDescription}
                     onChangeText={setServiceDescription}
+                    maxLength={300}
                     multiline
                     numberOfLines={3}
                     placeholder="Describe tools provided, warranty, emergency timing..."
@@ -1549,6 +1555,7 @@ export default function ManualServiceDashboardScreen() {
                   <TextInput
                     value={dealTitle}
                     onChangeText={setDealTitle}
+                    maxLength={60}
                     placeholder="e.g. 20% Off on Home Deep Cleaning & Plumbing"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600' }}
@@ -1562,6 +1569,7 @@ export default function ManualServiceDashboardScreen() {
                   <TextInput
                     value={dealDiscount}
                     onChangeText={setDealDiscount}
+                    maxLength={30}
                     placeholder="e.g. 20% OFF, FLAT ₹100 OFF"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '700', color: '#d97706', marginBottom: 6 }}
@@ -1595,6 +1603,7 @@ export default function ManualServiceDashboardScreen() {
                   <TextInput
                     value={dealValidUntil}
                     onChangeText={setDealValidUntil}
+                    maxLength={40}
                     placeholder="Valid till Sunday / This week only"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600' }}
@@ -1656,6 +1665,7 @@ export default function ManualServiceDashboardScreen() {
                   <TextInput
                     value={editName}
                     onChangeText={setEditName}
+                    maxLength={50}
                     placeholder="e.g. Ramesh Plumbing Works"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600' }}
@@ -1669,6 +1679,7 @@ export default function ManualServiceDashboardScreen() {
                   <TextInput
                     value={editTrade}
                     onChangeText={setEditTrade}
+                    maxLength={40}
                     placeholder="e.g. Plumbing, Electrician, Cleaning"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600' }}
@@ -1682,6 +1693,7 @@ export default function ManualServiceDashboardScreen() {
                   <TextInput
                     value={editPhone}
                     onChangeText={setEditPhone}
+                    maxLength={14}
                     keyboardType="phone-pad"
                     placeholder="Phone number"
                     placeholderTextColor="#94a3b8"
@@ -1708,6 +1720,7 @@ export default function ManualServiceDashboardScreen() {
                   <TextInput
                     value={editLocation}
                     onChangeText={setEditLocation}
+                    maxLength={80}
                     placeholder="Haveri Town, Karnataka"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600' }}

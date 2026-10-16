@@ -679,6 +679,7 @@ export default function AdminNotificationScreen() {
                       value={customHours}
                       onChangeText={setCustomHours}
                       keyboardType="numeric"
+                      maxLength={5}
                       placeholder="e.g., 36"
                       placeholderTextColor="#a855f7"
                       style={{

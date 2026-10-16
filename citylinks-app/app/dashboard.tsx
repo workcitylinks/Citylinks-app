@@ -3152,6 +3152,7 @@ export default function DashboardScreen() {
                   <TextInput
                     value={adminManualTitle}
                     onChangeText={setAdminManualTitle}
+                    maxLength={60}
                     placeholder="e.g. Electric Wiring & Switchboard Repair"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600' }}
@@ -3193,6 +3194,7 @@ export default function DashboardScreen() {
                   <TextInput
                     value={adminManualProvider}
                     onChangeText={setAdminManualProvider}
+                    maxLength={50}
                     placeholder="e.g. Ramesh Electrical & Hardware"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600' }}
@@ -3208,6 +3210,7 @@ export default function DashboardScreen() {
                     <TextInput
                       value={adminManualPhone}
                       onChangeText={setAdminManualPhone}
+                      maxLength={14}
                       keyboardType="phone-pad"
                       placeholder="e.g. 9449084242"
                       placeholderTextColor="#94a3b8"
@@ -3221,6 +3224,7 @@ export default function DashboardScreen() {
                     <TextInput
                       value={adminManualPrice}
                       onChangeText={setAdminManualPrice}
+                      maxLength={30}
                       placeholder="e.g. ₹249 onwards"
                       placeholderTextColor="#94a3b8"
                       style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600' }}
@@ -3236,6 +3240,7 @@ export default function DashboardScreen() {
                   <TextInput
                     value={adminManualLocation}
                     onChangeText={setAdminManualLocation}
+                    maxLength={80}
                     placeholder="e.g. Haveri Town, Ranebennur & nearby"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600' }}
@@ -3250,6 +3255,7 @@ export default function DashboardScreen() {
                   <TextInput
                     value={adminManualDesc}
                     onChangeText={setAdminManualDesc}
+                    maxLength={300}
                     multiline
                     numberOfLines={3}
                     placeholder="Details about experience, tools, emergency callout availability..."
@@ -3393,6 +3399,7 @@ export default function DashboardScreen() {
                   <TextInput
                     value={adminDigitalName}
                     onChangeText={setAdminDigitalName}
+                    maxLength={50}
                     placeholder="e.g. Rohit Digital Studios"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600' }}
@@ -3434,6 +3441,7 @@ export default function DashboardScreen() {
                   <TextInput
                     value={adminDigitalOffering}
                     onChangeText={setAdminDigitalOffering}
+                    maxLength={60}
                     placeholder="e.g. Modern responsive website, local SEO & domain setup"
                     placeholderTextColor="#94a3b8"
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600' }}
@@ -3449,6 +3457,7 @@ export default function DashboardScreen() {
                     <TextInput
                       value={adminDigitalPhone}
                       onChangeText={setAdminDigitalPhone}
+                      maxLength={14}
                       keyboardType="phone-pad"
                       placeholder="e.g. 9845112244"
                       placeholderTextColor="#94a3b8"
@@ -3462,6 +3471,7 @@ export default function DashboardScreen() {
                     <TextInput
                       value={adminDigitalPrice}
                       onChangeText={setAdminDigitalPrice}
+                      maxLength={30}
                       placeholder="e.g. ₹2,999 onwards"
                       placeholderTextColor="#94a3b8"
                       style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600' }}
@@ -3478,6 +3488,7 @@ export default function DashboardScreen() {
                     <TextInput
                       value={adminDigitalLocation}
                       onChangeText={setAdminDigitalLocation}
+                      maxLength={80}
                       placeholder="e.g. Online & Haveri Region"
                       placeholderTextColor="#94a3b8"
                       style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600' }}
@@ -3490,6 +3501,7 @@ export default function DashboardScreen() {
                     <TextInput
                       value={adminDigitalBadge}
                       onChangeText={setAdminDigitalBadge}
+                      maxLength={30}
                       placeholder="Verified / Top Rated"
                       placeholderTextColor="#94a3b8"
                       style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600' }}
@@ -3658,6 +3670,7 @@ export default function DashboardScreen() {
                 <TextInput
                   value={releaseVersion}
                   onChangeText={setReleaseVersion}
+                  maxLength={20}
                   placeholder="e.g. v1.2.0"
                   placeholderTextColor="#94a3b8"
                   style={{
@@ -3682,6 +3695,7 @@ export default function DashboardScreen() {
                 <TextInput
                   value={releaseUrl}
                   onChangeText={setReleaseUrl}
+                  maxLength={250}
                   placeholder="https://play.google.com/store/apps/details?id=... or https://citylinks.in/app-release.apk"
                   placeholderTextColor="#94a3b8"
                   autoCapitalize="none"
@@ -3711,6 +3725,7 @@ export default function DashboardScreen() {
                 <TextInput
                   value={releaseNotes}
                   onChangeText={setReleaseNotes}
+                  maxLength={350}
                   placeholder="e.g. Faster loading, Cloudflare media delivery, order tracking fixes, and UI improvements."
                   placeholderTextColor="#94a3b8"
                   multiline

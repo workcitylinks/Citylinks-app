@@ -79,6 +79,7 @@ export const PostTripRatingSheet: React.FC<PostTripRatingSheetProps> = ({
         style={styles.feedbackInput}
         placeholder="Optional: Leave Feedback..."
         placeholderTextColor="#94a3b8"
+        maxLength={250}
         value={feedbackText}
         onChangeText={setFeedbackText}
         multiline

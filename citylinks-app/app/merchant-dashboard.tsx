@@ -1104,9 +1104,6 @@ export default function MerchantDashboardScreen() {
                         {merchantDeals.length} ACTIVE
                       </Text>
                     </View>
-                    <Text style={{ fontSize: 11, color: '#64748b', fontWeight: '500' }} numberOfLines={1}>
-                      • Broadcasted in Haveri
-                    </Text>
                   </View>
                 </View>
               </View>
@@ -1429,6 +1426,7 @@ export default function MerchantDashboardScreen() {
                     onChangeText={setEditName}
                     placeholder="e.g. Renuka Appliances"
                     placeholderTextColor="#94a3b8"
+                    maxLength={50}
                     style={{
                       backgroundColor: '#f8fafc',
                       borderWidth: 1,
@@ -1504,6 +1502,7 @@ export default function MerchantDashboardScreen() {
                         onChangeText={setCustomCategory}
                         placeholder="e.g. Footwear, Bakery, Opticals, Stationery"
                         placeholderTextColor="#fb923c"
+                        maxLength={30}
                         style={{
                           backgroundColor: '#ffffff',
                           borderWidth: 1,
@@ -1563,6 +1562,7 @@ export default function MerchantDashboardScreen() {
                     onChangeText={setEditLocation}
                     placeholder="Operating Area (e.g. Haveri Town)"
                     placeholderTextColor="#94a3b8"
+                    maxLength={50}
                     style={{
                       backgroundColor: '#f8fafc',
                       borderWidth: 1,
@@ -1583,6 +1583,7 @@ export default function MerchantDashboardScreen() {
                     placeholderTextColor="#94a3b8"
                     multiline
                     numberOfLines={2}
+                    maxLength={120}
                     style={{
                       backgroundColor: '#f8fafc',
                       borderWidth: 1,
@@ -1607,6 +1608,7 @@ export default function MerchantDashboardScreen() {
                     placeholder="e.g. 09449084242"
                     keyboardType="phone-pad"
                     placeholderTextColor="#94a3b8"
+                    maxLength={14}
                     style={{
                       backgroundColor: '#f8fafc',
                       borderWidth: 1,
@@ -1631,6 +1633,7 @@ export default function MerchantDashboardScreen() {
                     placeholder="e.g. sachi.hvr@gmail.com"
                     keyboardType="email-address"
                     placeholderTextColor="#94a3b8"
+                    maxLength={50}
                     style={{
                       backgroundColor: '#f8fafc',
                       borderWidth: 1,
@@ -1689,6 +1692,7 @@ export default function MerchantDashboardScreen() {
               onChangeText={setProdName}
               placeholder="Product Name (e.g. 10mm Steel Nut)"
               placeholderTextColor="#94a3b8"
+              maxLength={50}
               style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 14, fontWeight: '600', marginBottom: 12 }}
             />
 
@@ -1698,6 +1702,7 @@ export default function MerchantDashboardScreen() {
               placeholder="Price in ₹ (e.g. 5)"
               keyboardType="numeric"
               placeholderTextColor="#94a3b8"
+              maxLength={8}
               style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 14, fontWeight: '600', marginBottom: 12 }}
             />
 
@@ -1824,6 +1829,7 @@ export default function MerchantDashboardScreen() {
                 onChangeText={setProdUnit}
                 placeholder="Unit (piece, kg)"
                 placeholderTextColor="#94a3b8"
+                maxLength={15}
                 style={{ flex: 1, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600' }}
               />
               <TextInput
@@ -1832,6 +1838,7 @@ export default function MerchantDashboardScreen() {
                 placeholder="Stock (100)"
                 keyboardType="numeric"
                 placeholderTextColor="#94a3b8"
+                maxLength={6}
                 style={{ flex: 1, backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600' }}
               />
             </View>
@@ -1904,6 +1911,7 @@ export default function MerchantDashboardScreen() {
                     onChangeText={setDealTitle}
                     placeholder="e.g. Flat 25% Off on All Grocery & Essentials"
                     placeholderTextColor="#94a3b8"
+                    maxLength={60}
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600', color: '#0f172a' }}
                   />
                 </View>
@@ -1918,6 +1926,7 @@ export default function MerchantDashboardScreen() {
                     onChangeText={setDealDiscount}
                     placeholder="e.g. 25% OFF, BUY 1 GET 1, FLAT ₹50 OFF"
                     placeholderTextColor="#94a3b8"
+                    maxLength={30}
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '700', color: '#d97706', marginBottom: 8 }}
                   />
                   {/* Preset Discount Chips */}
@@ -1960,6 +1969,7 @@ export default function MerchantDashboardScreen() {
                     onChangeText={setDealValidUntil}
                     placeholder="e.g. Valid till Sunday / Limited time offer"
                     placeholderTextColor="#94a3b8"
+                    maxLength={40}
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600', color: '#0f172a', marginBottom: 8 }}
                   />
                   {/* Preset Validity Chips */}
@@ -2002,6 +2012,7 @@ export default function MerchantDashboardScreen() {
                     onChangeText={setDealCategory}
                     placeholder="e.g. Shopping, Grocery, Electronics, Services"
                     placeholderTextColor="#94a3b8"
+                    maxLength={30}
                     style={{ backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12, fontSize: 13, fontWeight: '600', color: '#0f172a', marginBottom: 8 }}
                   />
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>

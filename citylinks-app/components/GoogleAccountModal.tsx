@@ -129,6 +129,7 @@ export const GoogleAccountModal: React.FC<GoogleAccountModalProps> = ({
                   <TextInput
                     value={customEmail}
                     onChangeText={setCustomEmail}
+                    maxLength={60}
                     placeholder="example@gmail.com"
                     keyboardType="email-address"
                     autoCapitalize="none"
@@ -141,6 +142,7 @@ export const GoogleAccountModal: React.FC<GoogleAccountModalProps> = ({
                   <TextInput
                     value={customName}
                     onChangeText={setCustomName}
+                    maxLength={50}
                     placeholder="Your Name"
                     style={styles.input}
                     placeholderTextColor="#94a3b8"

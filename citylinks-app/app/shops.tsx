@@ -220,6 +220,7 @@ export default function NearbyShopsScreen() {
             <TextInput
               placeholder="Search shops or category..."
               placeholderTextColor="#94a3b8"
+              maxLength={60}
               value={searchQuery}
               onChangeText={setSearchQuery}
               className="flex-1 ml-2.5 text-slate-800 text-xs font-normal"

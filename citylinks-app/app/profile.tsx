@@ -641,6 +641,7 @@ export default function ProfileScreen() {
                 <Text className="text-xs font-semibold text-slate-700 mb-1.5">First Name</Text>
                 <TextInput
                   placeholder="Enter first name"
+                  maxLength={35}
                   value={formData.firstName}
                   onChangeText={(val) => setFormData(prev => ({ ...prev, firstName: val }))}
                   className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-slate-800 text-sm"
@@ -652,6 +653,7 @@ export default function ProfileScreen() {
                 <Text className="text-xs font-semibold text-slate-700 mb-1.5">Last Name</Text>
                 <TextInput
                   placeholder="Enter last name"
+                  maxLength={35}
                   value={formData.lastName}
                   onChangeText={(val) => setFormData(prev => ({ ...prev, lastName: val }))}
                   className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-slate-800 text-sm"
@@ -664,6 +666,7 @@ export default function ProfileScreen() {
                 <TextInput
                   placeholder="e.g. +91 9876543210"
                   keyboardType="phone-pad"
+                  maxLength={14}
                   value={formData.phone}
                   onChangeText={(val) => setFormData(prev => ({ ...prev, phone: val }))}
                   className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-slate-800 text-sm"
@@ -706,6 +709,7 @@ export default function ProfileScreen() {
                   placeholder="Enter your doorstep or shop address"
                   multiline
                   numberOfLines={2}
+                  maxLength={150}
                   value={formData.address}
                   onChangeText={(val) => setFormData(prev => ({ ...prev, address: val }))}
                   className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3 text-slate-800 text-sm"

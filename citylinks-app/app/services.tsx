@@ -234,6 +234,7 @@ export default function BookServiceScreen() {
             <TextInput
               placeholder="Search services..."
               placeholderTextColor="#94a3b8"
+              maxLength={60}
               value={searchQuery}
               onChangeText={setSearchQuery}
               className="flex-1 ml-3 text-slate-800 text-sm font-normal"

@@ -523,6 +523,7 @@ export default function ShopDetailScreen() {
               <TextInput
                 placeholder="Search products in this store..."
                 placeholderTextColor="#94a3b8"
+                maxLength={60}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 className="flex-1 ml-2 text-slate-800 text-xs font-normal"
