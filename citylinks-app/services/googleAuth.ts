@@ -91,7 +91,7 @@ export async function startGoogleOAuthFlow(
     const clientRedirectUri = Linking.createURL('auth');
 
     // 2. Build backend Google OAuth start URL
-    const baseUrl = apiClient.defaults.baseURL || 'http://192.168.0.108:5001/api';
+    const baseUrl = apiClient.defaults.baseURL || 'https://api.citylinks.in/api';
     const startUrl = `${baseUrl}/auth/google/start?redirect_uri=${encodeURIComponent(clientRedirectUri)}`;
 
     // Set up dual-channel promise (resolves via openAuthSessionAsync OR via system deep-link event)
