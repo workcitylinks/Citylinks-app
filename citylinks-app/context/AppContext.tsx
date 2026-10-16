@@ -121,8 +121,13 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             setUserData(profileRes.data);
             await AsyncStorage.setItem('user_data', JSON.stringify(profileRes.data));
           }
-        } catch (apiErr) {
-          // offline or token expired
+        } catch (apiErr: any) {
+          // If server explicitly says user not found or session invalid, clear stale credentials
+          if (apiErr?.response?.status === 401 || apiErr?.response?.status === 404) {
+            console.warn('[AppContext] Stored user does not exist on active server (401/404). Clearing stale session.');
+            await logout();
+            return;
+          }
         }
 
         // Sync push notification token to newly authenticated user profile
@@ -185,7 +190,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
               setUserData(res.data);
               await AsyncStorage.setItem('user_data', JSON.stringify(res.data));
             }
-          }).catch(() => {});
+          }).catch(async (apiErr: any) => {
+            if (apiErr?.response?.status === 401 || apiErr?.response?.status === 404) {
+              console.warn('[AppContext] Stored user does not exist on active server (401/404). Clearing stale session.');
+              await logout();
+            }
+          });
         }
 
         // Preload counts and phone display settings

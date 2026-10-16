@@ -89,3 +89,26 @@ apiClient.interceptors.request.use(async (config) => {
   return config;
 });
 
+// Handle global unauthorized responses (e.g. stale tokens or non-existent user on active server)
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error?.response?.status === 401) {
+      const errText = String(error.response?.data?.error || error.response?.data?.message || '').toLowerCase();
+      if (
+        errText.includes('not found') ||
+        errText.includes('invalid token') ||
+        errText.includes('session expired') ||
+        errText.includes('please log in') ||
+        errText.includes('please sign in')
+      ) {
+        console.warn('[CityLinks API] 401 received: user session invalid on current server. Clearing token.');
+        await AsyncStorage.removeItem('user_token').catch(() => {});
+        await AsyncStorage.removeItem('user_data').catch(() => {});
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+

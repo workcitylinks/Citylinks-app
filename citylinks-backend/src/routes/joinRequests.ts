@@ -103,7 +103,13 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res: Respo
 
     // 1. Check if user is already verified/active in this role
     const currentUser = await prisma.user.findUnique({ where: { id: userId } });
-    if (currentUser?.role === roleEnum) {
+    if (!currentUser) {
+      return res.status(401).json({
+        error: 'Your user profile was not found on this server. Please sign out and sign in again.',
+      });
+    }
+
+    if (currentUser.role === roleEnum) {
       return res.status(400).json({
         error: `Your account is already active as a ${roleName}. You cannot apply for the same position again.`,
       });
@@ -194,12 +200,18 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res: Respo
     }
 
     // Process transport multi-vehicle data if applicable
+    const parseSafeFloat = (val: any): number | null => {
+      if (val === undefined || val === null || val === '') return null;
+      const num = parseFloat(String(val));
+      return Number.isFinite(num) ? num : null;
+    };
+
     let finalVehiclesJson: string | null = null;
     let primaryType = vehicleType ? String(vehicleType).trim() : null;
     let primaryModel = vehicleModel ? String(vehicleModel).trim() : null;
     let primaryPlate = vehiclePlate ? String(vehiclePlate).trim().toUpperCase() : null;
-    let primaryRate = ratePerKm ? parseFloat(ratePerKm) : null;
-    let primaryBase = baseFare ? parseFloat(baseFare) : null;
+    let primaryRate = parseSafeFloat(ratePerKm);
+    let primaryBase = parseSafeFloat(baseFare);
 
     if (role === Role.TRANSPORT) {
       if (Array.isArray(vehicles) && vehicles.length > 0) {
@@ -207,8 +219,8 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res: Respo
           vehicleType: (v.vehicleType === 'Other' && v.customVehicleType ? v.customVehicleType : v.vehicleType) || 'Car',
           modelName: v.modelName || `Commercial Vehicle ${index + 1}`,
           plateNumber: (v.plateNumber || '').toUpperCase().trim(),
-          ratePerKm: parseFloat(v.ratePerKm) || 20.0,
-          baseFare: parseFloat(v.baseFare) || 30.0,
+          ratePerKm: parseSafeFloat(v.ratePerKm) ?? 20.0,
+          baseFare: parseSafeFloat(v.baseFare) ?? 30.0,
           isPrimary: index === 0,
         }));
         finalVehiclesJson = JSON.stringify(cleanVehicles);
@@ -269,6 +281,16 @@ router.post('/', authenticateToken, async (req: AuthenticatedRequest, res: Respo
     });
   } catch (error: any) {
     console.error('Error submitting join request:', error);
+    if (error?.code === 'P2003') {
+      return res.status(401).json({
+        error: 'Your user profile was not found on this server. Please sign out and sign in again.',
+      });
+    }
+    if (error?.code === 'P2002') {
+      return res.status(400).json({
+        error: 'An application with these details already exists.',
+      });
+    }
     return res.status(500).json({ error: error.message || 'Failed to submit join request.' });
   }
 });
@@ -282,6 +304,11 @@ router.get('/my-status', authenticateToken, async (req: AuthenticatedRequest, re
     const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const currentUser = await prisma.user.findUnique({ where: { id: userId } });
+    if (!currentUser) {
+      return res.status(401).json({ error: 'User account not found on this server. Please sign in again.' });
     }
 
     const allRequests = await prisma.joinRequest.findMany({

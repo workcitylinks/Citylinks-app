@@ -661,8 +661,24 @@ export default function JoinUsScreen() {
       showSuccess('Your request has been submitted to Super Admin!', 'Request Sent');
       setSuccessModalOpen(true);
     } catch (err: any) {
-      console.error('Join request error:', err);
-      showError(err.response?.data?.error || 'Failed to submit join request. Please try again.', 'Error');
+      console.error('Join request error:', {
+        status: err.response?.status,
+        data: err.response?.data,
+        message: err.message,
+      });
+
+      const serverError = err.response?.data?.error || err.response?.data?.message;
+
+      if (err.response?.status === 401) {
+        showError(
+          serverError || 'Your session has expired or account is invalid. Please sign in again.',
+          'Session Expired'
+        );
+        router.push('/auth' as any);
+        return;
+      }
+
+      showError(serverError || 'Failed to submit join request. Please try again.', 'Error');
     } finally {
       setSubmitting(false);
     }
