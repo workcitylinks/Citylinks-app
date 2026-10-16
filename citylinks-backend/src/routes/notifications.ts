@@ -150,6 +150,20 @@ router.get('/', optionalAuthToken, async (req: AuthenticatedRequest, res) => {
       });
     }
 
+    // Query latest release URL to attach to app_update notifications
+    let latestAppUpdateUrl: string | null = null;
+    try {
+      const releaseRow: any = await prisma.$queryRawUnsafe(
+        `SELECT "value" FROM "SystemSetting" WHERE "key" = 'LATEST_APP_RELEASE' LIMIT 1;`
+      );
+      if (releaseRow && releaseRow.length > 0) {
+        const parsed = JSON.parse(releaseRow[0].value);
+        if (parsed?.updateUrl) {
+          latestAppUpdateUrl = parsed.updateUrl;
+        }
+      }
+    } catch (_) {}
+
     // Filter and compute per-user read status (isolating this user from all other users)
     const userNotifications = rawNotifications
       .filter((n) => {
@@ -180,10 +194,12 @@ router.get('/', optionalAuthToken, async (req: AuthenticatedRequest, res) => {
       .map((n) => {
         const state = userStateMap.get(n.id);
         const userHasRead = n.userId === userId ? (n.isRead || state?.isRead || false) : (state?.isRead === true);
+        const isAppUpdate = n.type === 'app_update' || (n.title && n.title.toLowerCase().includes('update'));
 
         return {
           ...n,
           isRead: userHasRead,
+          route: isAppUpdate ? (latestAppUpdateUrl || undefined) : undefined,
         };
       });
 

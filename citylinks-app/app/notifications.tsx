@@ -31,6 +31,7 @@ import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
 import { triggerLocalNotification } from '../services/pushNotifications';
+import * as WebBrowser from 'expo-web-browser';
 
 export interface NotificationItem {
   id: string;
@@ -47,6 +48,7 @@ export interface NotificationItem {
 interface SwipeableNotificationCardProps {
   notification: NotificationItem;
   onPress: () => void;
+  onUpdatePress?: (notification: NotificationItem) => void;
   onDelete: (id: string) => void;
   formatRelativeTime: (isoString: string) => string;
   getTypeIcon: (type: string) => { icon: React.ReactNode; bg: string };
@@ -55,6 +57,7 @@ interface SwipeableNotificationCardProps {
 const SwipeableNotificationCard: React.FC<SwipeableNotificationCardProps> = ({
   notification,
   onPress,
+  onUpdatePress,
   onDelete,
   formatRelativeTime,
   getTypeIcon,
@@ -187,9 +190,8 @@ const SwipeableNotificationCard: React.FC<SwipeableNotificationCardProps> = ({
             <View className="flex-1">
               <View className="flex-row items-center justify-between mb-1">
                 <Text
-                  className={`text-sm font-bold flex-1 mr-2 ${
-                    isUnread ? 'text-slate-900' : 'text-slate-600'
-                  }`}
+                  className={`text-sm font-bold flex-1 mr-2 ${isUnread ? 'text-slate-900' : 'text-slate-600'
+                    }`}
                   numberOfLines={1}
                 >
                   {notification.title}
@@ -200,18 +202,48 @@ const SwipeableNotificationCard: React.FC<SwipeableNotificationCardProps> = ({
               </View>
 
               <Text
-                className={`text-xs leading-5 mb-2.5 ${
-                  isUnread ? 'text-slate-700' : 'text-slate-500'
-                }`}
+                className={`text-xs leading-5 mb-2.5 ${isUnread ? 'text-slate-700' : 'text-slate-500'
+                  }`}
               >
                 {notification.message}
               </Text>
 
-              {notification.type === 'app_update' && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f5f3ff', borderColor: '#ddd6fe', borderWidth: 1, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, alignSelf: 'flex-start', marginBottom: 10, gap: 6 }}>
-                  <Rocket size={13} color="#7c3aed" />
-                  <Text style={{ fontSize: 11, fontWeight: '800', color: '#7c3aed' }}>Tap to Update App ➔</Text>
-                </View>
+              {(notification.type === 'app_update' ||
+                notification.title.toLowerCase().includes('update') ||
+                notification.message.toLowerCase().includes('tap to update') ||
+                notification.message.toLowerCase().includes('new update')) && (
+                <TouchableOpacity
+                  activeOpacity={0.75}
+                  onPress={(e) => {
+                    e?.stopPropagation?.();
+                    if (onUpdatePress) {
+                      onUpdatePress(notification);
+                    } else {
+                      onPress();
+                    }
+                  }}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: '#7c3aed',
+                    paddingHorizontal: 14,
+                    paddingVertical: 8,
+                    borderRadius: 10,
+                    alignSelf: 'flex-start',
+                    marginBottom: 10,
+                    gap: 6,
+                    shadowColor: '#7c3aed',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.25,
+                    shadowRadius: 4,
+                    elevation: 3,
+                  }}
+                >
+                  <Rocket size={13} color="#ffffff" />
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: '#ffffff' }}>
+                    Tap to Update App ➔
+                  </Text>
+                </TouchableOpacity>
               )}
 
               <View className="flex-row items-center justify-between">
@@ -225,8 +257,8 @@ const SwipeableNotificationCard: React.FC<SwipeableNotificationCardProps> = ({
                     {notification.type === 'app_update'
                       ? '🚀 App Update'
                       : notification.type === 'promo'
-                      ? 'Special Offer'
-                      : 'CityLinks Alert'}
+                        ? 'Special Offer'
+                        : 'CityLinks Alert'}
                   </Text>
                 </View>
 
@@ -360,6 +392,60 @@ export default function NotificationsScreen() {
       await refreshNotificationCount();
     } catch (err) {
       console.error('Error marking as read:', err);
+    }
+  };
+
+  const handleOpenUpdateLink = async (n: NotificationItem) => {
+    try {
+      handleMarkAsRead(n.id, n.isRead);
+
+      let targetUrl = (n.route || '').trim();
+
+      // 1. If route is not a valid URL, search message for http/https link
+      if (!targetUrl || (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://') && !targetUrl.includes('.'))) {
+        const urlMatch = (n.message || '').match(/https?:\/\/[^\s]+/i);
+        if (urlMatch && urlMatch[0]) {
+          targetUrl = urlMatch[0].trim();
+        }
+      }
+
+      // 2. Fallback: Query latest active app release from backend API
+      if (!targetUrl || (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://') && !targetUrl.includes('.'))) {
+        try {
+          const res = await apiClient.get('/app-release/latest');
+          if (res.data?.release?.updateUrl) {
+            targetUrl = res.data.release.updateUrl.trim();
+          } else {
+            const adminRes = await apiClient.get('/admin/app-release/latest').catch(() => null);
+            if (adminRes?.data?.release?.updateUrl) {
+              targetUrl = adminRes.data.release.updateUrl.trim();
+            }
+          }
+        } catch (fetchErr) {
+          console.warn('Failed to query latest app release:', fetchErr);
+        }
+      }
+
+      // 3. Fallback to citylinks website
+      if (!targetUrl) {
+        targetUrl = 'https://citylinks.in';
+      }
+
+      // Prepend https:// if missing scheme
+      if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+        targetUrl = 'https://' + targetUrl;
+      }
+
+      // 4. Open the link's page in browser / Play Store
+      const canOpen = await Linking.canOpenURL(targetUrl).catch(() => true);
+      if (canOpen) {
+        await Linking.openURL(targetUrl);
+      } else {
+        await WebBrowser.openBrowserAsync(targetUrl);
+      }
+    } catch (err) {
+      console.error('Error opening update page:', err);
+      showError('Could not open the update link. Please check your browser.', 'Update Link');
     }
   };
 
@@ -535,16 +621,14 @@ export default function NotificationsScreen() {
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => setActiveTab('all')}
-              className={`px-4 py-1.5 rounded-full border ${
-                activeTab === 'all'
+              className={`px-4 py-1.5 rounded-full border ${activeTab === 'all'
                   ? 'bg-primary border-primary'
                   : 'bg-slate-50 border-slate-200'
-              }`}
+                }`}
             >
               <Text
-                className={`text-xs font-bold ${
-                  activeTab === 'all' ? 'text-white' : 'text-slate-600'
-                }`}
+                className={`text-xs font-bold ${activeTab === 'all' ? 'text-white' : 'text-slate-600'
+                  }`}
               >
                 All ({notifications.length})
               </Text>
@@ -553,16 +637,14 @@ export default function NotificationsScreen() {
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => setActiveTab('unread')}
-              className={`px-4 py-1.5 rounded-full border ${
-                activeTab === 'unread'
+              className={`px-4 py-1.5 rounded-full border ${activeTab === 'unread'
                   ? 'bg-primary border-primary'
                   : 'bg-slate-50 border-slate-200'
-              }`}
+                }`}
             >
               <Text
-                className={`text-xs font-bold ${
-                  activeTab === 'unread' ? 'text-white' : 'text-slate-600'
-                }`}
+                className={`text-xs font-bold ${activeTab === 'unread' ? 'text-white' : 'text-slate-600'
+                  }`}
               >
                 Unread ({unreadCount})
               </Text>
@@ -610,8 +692,20 @@ export default function NotificationsScreen() {
               <SwipeableNotificationCard
                 key={n.id}
                 notification={n}
+                onUpdatePress={handleOpenUpdateLink}
                 onPress={() => {
                   handleMarkAsRead(n.id, n.isRead);
+
+                  const isAppUpdate =
+                    n.type === 'app_update' ||
+                    n.title.toLowerCase().includes('update') ||
+                    n.message.toLowerCase().includes('tap to update') ||
+                    n.message.toLowerCase().includes('new update');
+
+                  if (isAppUpdate) {
+                    handleOpenUpdateLink(n);
+                    return;
+                  }
 
                   const isTransport =
                     n.type === 'transport' ||
@@ -641,13 +735,6 @@ export default function NotificationsScreen() {
                   if (isDealOrOffer) {
                     router.push('/deals');
                     return;
-                  }
-
-                  if (n.type === 'app_update' || n.title.toLowerCase().includes('update')) {
-                    if (n.route && (n.route.startsWith('http://') || n.route.startsWith('https://'))) {
-                      Linking.openURL(n.route).catch(() => {});
-                      return;
-                    }
                   }
                 }}
                 onDelete={handleDeleteNotification}
