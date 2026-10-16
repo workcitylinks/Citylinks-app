@@ -58,6 +58,7 @@ import {
   Briefcase,
   Car,
   Navigation,
+  Rocket,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useApp } from '../context/AppContext';
@@ -486,6 +487,69 @@ export default function DashboardScreen() {
       showError(err.response?.data?.error || 'Failed to publish digital service', 'Error');
     } finally {
       setSubmittingDigital(false);
+    }
+  };
+
+  // Super Admin: App Update Release Modal State
+  const [updateReleaseModalOpen, setUpdateReleaseModalOpen] = useState(false);
+  const [releaseVersion, setReleaseVersion] = useState('v1.1.0');
+  const [releaseUrl, setReleaseUrl] = useState('');
+  const [releaseNotes, setReleaseNotes] = useState('');
+  const [submittingRelease, setSubmittingRelease] = useState(false);
+  const [currentActiveRelease, setCurrentActiveRelease] = useState<any>(null);
+
+  const fetchLatestAppRelease = async () => {
+    try {
+      const res = await apiClient.get('/admin/app-release/latest');
+      if (res.data?.release) {
+        setCurrentActiveRelease(res.data.release);
+        if (res.data.release.version) {
+          const currentV = res.data.release.version.replace(/^v/, '');
+          const parts = currentV.split('.').map(Number);
+          if (parts.length === 3 && !isNaN(parts[2])) {
+            setReleaseVersion(`v${parts[0]}.${parts[1]}.${parts[2] + 1}`);
+          }
+        }
+      }
+    } catch (e) {}
+  };
+
+  const handlePublishAppRelease = async () => {
+    if (!releaseUrl || !releaseUrl.trim()) {
+      showError('Please enter the update download or store URL.', 'Missing URL');
+      return;
+    }
+
+    let formattedUrl = releaseUrl.trim();
+    if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
+      formattedUrl = 'https://' + formattedUrl;
+    }
+
+    try {
+      setSubmittingRelease(true);
+      const res = await apiClient.post('/admin/app-release', {
+        version: releaseVersion.trim() || 'v1.1.0',
+        updateUrl: formattedUrl,
+        notes: releaseNotes.trim() || null,
+      });
+
+      if (res.data?.success) {
+        showSuccess(
+          `Update ${releaseVersion} released! Broadcasted to all citizens & locked update card dispatched.`,
+          'Update Released!'
+        );
+        setUpdateReleaseModalOpen(false);
+        setReleaseNotes('');
+        setReleaseUrl('');
+        fetchLatestAppRelease();
+      } else {
+        showError(res.data?.error || 'Failed to publish release', 'Error');
+      }
+    } catch (err: any) {
+      console.error('Error releasing update:', err);
+      showError(err.response?.data?.error || err.message || 'Failed to release update', 'Error');
+    } finally {
+      setSubmittingRelease(false);
     }
   };
 
@@ -1362,6 +1426,47 @@ export default function DashboardScreen() {
                 </View>
               </View>
               <ArrowRight size={18} color="#d97706" />
+            </TouchableOpacity>
+
+            {/* Quick Actions Row: App Update Release Card */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => {
+                fetchLatestAppRelease();
+                setUpdateReleaseModalOpen(true);
+              }}
+              style={{
+                backgroundColor: '#ffffff',
+                borderRadius: 20,
+                padding: 14,
+                borderWidth: 1.5,
+                borderColor: '#c4b5fd',
+                shadowColor: '#7c3aed',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.08,
+                shadowRadius: 6,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <View className="flex-row items-center flex-1 mr-2">
+                <View className="w-11 h-11 rounded-xl bg-purple-50 items-center justify-center mr-3 border border-purple-200">
+                  <Rocket size={22} color="#7c3aed" />
+                </View>
+                <View className="flex-1">
+                  <View className="flex-row items-center gap-2">
+                    <Text className="text-sm font-bold text-slate-900">Release App Update</Text>
+                    <View className="bg-purple-100 px-2 py-0.5 rounded-full">
+                      <Text className="text-[10px] font-bold text-purple-800">🚀 New Release</Text>
+                    </View>
+                  </View>
+                  <Text className="text-[11px] text-slate-400 mt-0.5">
+                    Enter update URL & publish persistent update card to all app users
+                  </Text>
+                </View>
+              </View>
+              <ArrowRight size={18} color="#7c3aed" />
             </TouchableOpacity>
 
             {/* Quick Actions Row 3: Phone Management Toggle Card */}
@@ -3433,6 +3538,183 @@ export default function DashboardScreen() {
                 </TouchableOpacity>
               </ScrollView>
             </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Super Admin: Release App Update Modal */}
+      <Modal visible={updateReleaseModalOpen} transparent animationType="slide">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.65)', justifyContent: 'flex-end' }}
+        >
+          <View
+            style={{
+              backgroundColor: '#ffffff',
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
+              maxHeight: '90%',
+              paddingHorizontal: 20,
+              paddingTop: 16,
+              paddingBottom: 28,
+            }}
+          >
+            {/* Modal Header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 14, borderBottomWidth: 1, borderColor: '#f1f5f9' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: '#f5f3ff', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#ddd6fe' }}>
+                  <Rocket size={22} color="#7c3aed" />
+                </View>
+                <View>
+                  <Text style={{ fontSize: 17, fontWeight: '800', color: '#0f172a' }}>Release App Update</Text>
+                  <Text style={{ fontSize: 12, color: '#64748b' }}>Broadcasts mandatory update card to all users</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setUpdateReleaseModalOpen(false)}
+                style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <X size={18} color="#475569" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 16, paddingBottom: 20 }}>
+              {/* Active Release Status Callout if one exists */}
+              {currentActiveRelease && (
+                <View style={{ backgroundColor: '#f0fdf4', borderColor: '#bbf7d0', borderWidth: 1, borderRadius: 14, padding: 12, marginBottom: 16 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                    <Sparkles size={14} color="#16a34a" />
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#166534' }}>
+                      Currently Active Version: {currentActiveRelease.version}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 11, color: '#15803d' }} numberOfLines={1}>
+                    Link: {currentActiveRelease.updateUrl}
+                  </Text>
+                </View>
+              )}
+
+              {/* Version Code Input */}
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#334155', marginBottom: 6 }}>
+                  Version Code / Tag <Text style={{ color: '#ef4444' }}>*</Text>
+                </Text>
+                <TextInput
+                  value={releaseVersion}
+                  onChangeText={setReleaseVersion}
+                  placeholder="e.g. v1.2.0"
+                  placeholderTextColor="#94a3b8"
+                  style={{
+                    backgroundColor: '#f8fafc',
+                    borderWidth: 1.5,
+                    borderColor: '#e2e8f0',
+                    borderRadius: 14,
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    fontSize: 14,
+                    color: '#0f172a',
+                    fontWeight: '600',
+                  }}
+                />
+              </View>
+
+              {/* Update Download URL Input */}
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#334155', marginBottom: 6 }}>
+                  Update Download Link / URL <Text style={{ color: '#ef4444' }}>*</Text>
+                </Text>
+                <TextInput
+                  value={releaseUrl}
+                  onChangeText={setReleaseUrl}
+                  placeholder="https://play.google.com/store/apps/details?id=... or https://citylinks.in/app-release.apk"
+                  placeholderTextColor="#94a3b8"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  style={{
+                    backgroundColor: '#f8fafc',
+                    borderWidth: 1.5,
+                    borderColor: releaseUrl.trim() ? '#7c3aed' : '#e2e8f0',
+                    borderRadius: 14,
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    fontSize: 13,
+                    color: '#0f172a',
+                  }}
+                />
+                <Text style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                  Citizens will be redirected to this link when they click "Update & Launch Now".
+                </Text>
+              </View>
+
+              {/* Release Notes (Optional) */}
+              <View style={{ marginBottom: 20 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#334155', marginBottom: 6 }}>
+                  Release Notes / What's New <Text style={{ fontSize: 12, color: '#94a3b8', fontWeight: '400' }}>(Optional)</Text>
+                </Text>
+                <TextInput
+                  value={releaseNotes}
+                  onChangeText={setReleaseNotes}
+                  placeholder="e.g. Faster loading, Cloudflare media delivery, order tracking fixes, and UI improvements."
+                  placeholderTextColor="#94a3b8"
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                  style={{
+                    backgroundColor: '#f8fafc',
+                    borderWidth: 1.5,
+                    borderColor: '#e2e8f0',
+                    borderRadius: 14,
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    fontSize: 13,
+                    color: '#0f172a',
+                    minHeight: 90,
+                  }}
+                />
+              </View>
+
+              {/* Behavior Note Box */}
+              <View style={{ backgroundColor: '#fef3c7', borderColor: '#fde68a', borderWidth: 1, borderRadius: 14, padding: 12, marginBottom: 20 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#92400e', marginBottom: 2 }}>
+                  ℹ️ User Experience Behavior:
+                </Text>
+                <Text style={{ fontSize: 11, color: '#b45309', lineHeight: 16 }}>
+                  Upon clicking submit, all users will receive a mobile push notification, an in-app alert in the Notifications tab, and a locked Update Card on their screen that only disappears after clicking Update.
+                </Text>
+              </View>
+
+              {/* Submit Button */}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                disabled={submittingRelease}
+                onPress={handlePublishAppRelease}
+                style={{
+                  backgroundColor: '#7c3aed',
+                  paddingVertical: 15,
+                  borderRadius: 16,
+                  alignItems: 'center',
+                  flexDirection: 'row',
+                  justifyContent: 'center',
+                  shadowColor: '#7c3aed',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 8,
+                  elevation: 5,
+                }}
+              >
+                {submittingRelease ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <>
+                    <Rocket size={18} color="#ffffff" style={{ marginRight: 8 }} />
+                    <Text style={{ fontSize: 15, fontWeight: '800', color: '#ffffff' }}>
+                      Publish & Broadcast Update
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>

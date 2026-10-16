@@ -21,6 +21,7 @@ import { NetworkProvider } from '../context/NetworkContext';
 import SplashScreenView from '../components/SplashScreenView';
 import NoInternetModal from '../components/NoInternetModal';
 import { LiveNotificationBanner } from '../components/LiveNotificationBanner';
+import { AppUpdateModal } from '../components/AppUpdateModal';
 
 function RootContent() {
   const { isAppReady } = useApp();
@@ -86,6 +87,9 @@ function RootContent() {
 
       {/* Real-time Heads-Up Mobile Notification Banner */}
       <LiveNotificationBanner />
+
+      {/* Mandatory App Update Overlay Modal */}
+      <AppUpdateModal />
 
       {/* Custom splash screen overlay displayed smoothly during app initialization */}
       {!isAppReady && (

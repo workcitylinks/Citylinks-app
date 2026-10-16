@@ -47,6 +47,24 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'CityLinks API is running' });
 });
 
+// Public App Release Endpoint - Checks for latest published version
+app.get('/api/app-release/latest', async (req, res) => {
+  try {
+    const row: any = await prisma.$queryRawUnsafe(
+      `SELECT "value", "updatedAt" FROM "SystemSetting" WHERE "key" = 'LATEST_APP_RELEASE' LIMIT 1;`
+    );
+    if (row && row.length > 0) {
+      try {
+        const release = JSON.parse(row[0].value);
+        return res.json({ success: true, release });
+      } catch (pErr) {}
+    }
+    return res.json({ success: true, release: null });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Failed to fetch latest app release' });
+  }
+});
+
 // Example route
 app.get('/api/users', async (req, res) => {
   try {

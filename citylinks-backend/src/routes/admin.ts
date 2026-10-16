@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { Role } from '@prisma/client';
+import { createAndSendNotification } from '../services/notificationService';
 
 const router = Router();
 
@@ -232,6 +233,107 @@ router.put('/phone-settings', authenticateToken, async (req: AuthenticatedReques
   } catch (error: any) {
     console.error('Error updating phone settings:', error);
     return res.status(500).json({ error: 'Failed to update phone settings' });
+  }
+});
+
+/**
+ * GET /api/admin/app-release/latest
+ * Retrieve the latest active app update release
+ */
+router.get('/app-release/latest', async (req, res) => {
+  try {
+    const row: any = await prisma.$queryRawUnsafe(
+      `SELECT "value", "updatedAt" FROM "SystemSetting" WHERE "key" = 'LATEST_APP_RELEASE' LIMIT 1;`
+    );
+    if (row && row.length > 0) {
+      try {
+        const release = JSON.parse(row[0].value);
+        return res.json({ success: true, release });
+      } catch (pErr) {}
+    }
+    return res.json({ success: true, release: null });
+  } catch (err: any) {
+    console.error('Error fetching latest app release:', err);
+    return res.status(500).json({ error: 'Failed to fetch latest app release' });
+  }
+});
+
+/**
+ * POST /api/admin/app-release
+ * Super Admin releases a new app update and broadcasts to all users
+ */
+router.post('/app-release', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (req.user?.role !== Role.SUPER_ADMIN && req.user?.role !== Role.DEVELOPER) {
+      return res.status(403).json({ error: 'Access denied: Only Super Admins can publish app releases.' });
+    }
+
+    const { updateUrl, notes, version } = req.body;
+
+    if (!updateUrl || typeof updateUrl !== 'string' || !updateUrl.trim()) {
+      return res.status(400).json({ error: 'Update Download URL is required.' });
+    }
+
+    const cleanUrl = updateUrl.trim();
+    const cleanVersion = version && typeof version === 'string' && version.trim() ? version.trim() : 'v1.1.0';
+    const cleanNotes = notes && typeof notes === 'string' && notes.trim() ? notes.trim() : null;
+
+    const releasePayload = {
+      id: `release_${Date.now()}`,
+      version: cleanVersion,
+      updateUrl: cleanUrl,
+      notes: cleanNotes,
+      isMandatory: true,
+      releasedBy: req.user?.email || 'Super Admin',
+      createdAt: new Date().toISOString(),
+    };
+
+    // 1. Persist to Postgres SystemSetting
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO "SystemSetting" ("key", "value", "updatedAt") 
+       VALUES ('LATEST_APP_RELEASE', $1, NOW()) 
+       ON CONFLICT ("key") DO UPDATE SET "value" = $1, "updatedAt" = NOW();`,
+      JSON.stringify(releasePayload)
+    );
+
+    // 2. Broadcast push notification to all citizens and store in Notification table
+    try {
+      const notifTitle = `🚀 New Update Released: ${cleanVersion}!`;
+      const notifMessage = cleanNotes
+        ? `New update (${cleanVersion}) is available: ${cleanNotes}. Tap to update now!`
+        : `A new version of CityLinks (${cleanVersion}) is available. Tap to update now!`;
+
+      await createAndSendNotification({
+        userId: null, // Broadcast to all users!
+        title: notifTitle,
+        message: notifMessage,
+        type: 'app_update',
+        route: cleanUrl,
+        data: {
+          isAppUpdate: true,
+          releaseId: releasePayload.id,
+          version: cleanVersion,
+          updateUrl: cleanUrl,
+          notes: cleanNotes,
+        },
+      });
+      console.log(`[AppRelease] Broadcasted app update notification to all users: ${cleanVersion}`);
+    } catch (notifErr) {
+      console.error('[AppRelease] Error broadcasting notification:', notifErr);
+    }
+
+    // 3. Clear server cache
+    const { invalidateCache } = require('../middleware/cache');
+    invalidateCache();
+
+    return res.status(201).json({
+      success: true,
+      message: `App update ${cleanVersion} published and broadcasted to all users successfully!`,
+      release: releasePayload,
+    });
+  } catch (err: any) {
+    console.error('Error publishing app release:', err);
+    return res.status(500).json({ error: err.message || 'Failed to publish app release' });
   }
 });
 

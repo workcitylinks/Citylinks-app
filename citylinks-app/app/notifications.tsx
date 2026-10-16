@@ -8,6 +8,7 @@ import {
   Animated,
   PanResponder,
   Alert,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -23,6 +24,7 @@ import {
   Trash2,
   ChevronLeft,
   Car,
+  Rocket,
 } from 'lucide-react-native';
 import { apiClient } from '../api/apiClient';
 import { useApp } from '../context/AppContext';
@@ -34,7 +36,8 @@ export interface NotificationItem {
   id: string;
   title: string;
   message: string;
-  type: string; // info, promo, order, alert
+  type: string; // info, promo, order, alert, app_update
+  route?: string;
   isRead: boolean;
   createdAt: string;
   updatedAt?: string;
@@ -204,6 +207,13 @@ const SwipeableNotificationCard: React.FC<SwipeableNotificationCardProps> = ({
                 {notification.message}
               </Text>
 
+              {notification.type === 'app_update' && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f5f3ff', borderColor: '#ddd6fe', borderWidth: 1, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, alignSelf: 'flex-start', marginBottom: 10, gap: 6 }}>
+                  <Rocket size={13} color="#7c3aed" />
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: '#7c3aed' }}>Tap to Update App ➔</Text>
+                </View>
+              )}
+
               <View className="flex-row items-center justify-between">
                 <View className="flex-row items-center">
                   <Clock size={11} color="#94a3b8" />
@@ -212,7 +222,11 @@ const SwipeableNotificationCard: React.FC<SwipeableNotificationCardProps> = ({
                   </Text>
                   <Text className="text-slate-300 mx-1.5">·</Text>
                   <Text className="text-[11px] font-semibold text-blue-600 capitalize">
-                    {notification.type === 'promo' ? 'Special Offer' : 'CityLinks Alert'}
+                    {notification.type === 'app_update'
+                      ? '🚀 App Update'
+                      : notification.type === 'promo'
+                      ? 'Special Offer'
+                      : 'CityLinks Alert'}
                   </Text>
                 </View>
 
@@ -453,6 +467,11 @@ export default function NotificationsScreen() {
           icon: <Car size={18} color="#2563eb" />,
           bg: 'bg-blue-50 border-blue-100',
         };
+      case 'app_update':
+        return {
+          icon: <Rocket size={18} color="#7c3aed" />,
+          bg: 'bg-purple-50 border-purple-100',
+        };
       default:
         return {
           icon: <Bell size={18} color="#2563eb" />,
@@ -621,6 +640,14 @@ export default function NotificationsScreen() {
                     n.message.toLowerCase().includes('offer');
                   if (isDealOrOffer) {
                     router.push('/deals');
+                    return;
+                  }
+
+                  if (n.type === 'app_update' || n.title.toLowerCase().includes('update')) {
+                    if (n.route && (n.route.startsWith('http://') || n.route.startsWith('https://'))) {
+                      Linking.openURL(n.route).catch(() => {});
+                      return;
+                    }
                   }
                 }}
                 onDelete={handleDeleteNotification}
