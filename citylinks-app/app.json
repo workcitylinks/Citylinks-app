@@ -64,6 +64,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "343ccab8-e0c4-4490-aaab-25657bf934fa"
+      }
+    },
+    "owner": "citylinks"
   }
 }
