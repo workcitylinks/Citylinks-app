@@ -44,6 +44,8 @@ import {
   Check,
   Navigation,
   Maximize2,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react-native";
 import { router, useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -114,7 +116,9 @@ export default function Index() {
     cartCount,
     unreadNotificationsCount,
     switchUserRole,
-    logout
+    logout,
+    setUserData,
+    setUserToken,
   } = useApp();
 
   // Centralized cached queries for Home screen (eliminates duplicate calls on navigation)
@@ -137,6 +141,8 @@ export default function Index() {
   const [selectedShopCategory, setSelectedShopCategory] = useState<string | null>(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showDeleteRoleConfirm, setShowDeleteRoleConfirm] = useState(false);
+  const [deletingRole, setDeletingRole] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [enlargedImage, setEnlargedImage] = useState<{
     url: string;
@@ -215,6 +221,37 @@ export default function Index() {
     setShowLogoutConfirm(false);
     await logout();
     showSuccess("Signed out successfully", "Logged Out");
+  };
+
+  const handleDeleteRoleAccount = async () => {
+    try {
+      setDeletingRole(true);
+      const res = await apiClient.delete<{ success: boolean; message: string; user?: any; token?: string }>('/auth/role-account', {
+        data: { role: userRole }
+      });
+      if (res.data?.success) {
+        if (res.data.token) {
+          await AsyncStorage.setItem('user_token', res.data.token);
+          if (setUserToken) setUserToken(res.data.token);
+        }
+        await AsyncStorage.setItem('user_role', 'CUSTOMER');
+        if (res.data.user) {
+          await AsyncStorage.setItem('user_data', JSON.stringify(res.data.user));
+          if (setUserData) setUserData(res.data.user);
+        }
+        await refreshAuth();
+        showSuccess(res.data.message || 'Partner role account deleted successfully', 'Account Reset to Customer');
+        setShowDeleteRoleConfirm(false);
+        refetch({ force: true });
+      } else {
+        showError(res.data?.message || 'Failed to delete role account');
+      }
+    } catch (err: any) {
+      console.error('Failed to delete role account:', err);
+      showError(err.response?.data?.message || err.message || 'Failed to delete role account');
+    } finally {
+      setDeletingRole(false);
+    }
   };
 
   const q = searchQuery.trim().toLowerCase();
@@ -549,6 +586,22 @@ export default function Index() {
                 </TouchableOpacity>
               )}
 
+              {!isCustomer && userRole !== "SUPER_ADMIN" && (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    setShowUserMenu(false);
+                    setShowDeleteRoleConfirm(true);
+                  }}
+                  className="flex-row items-center px-4 py-3 hover:bg-rose-50"
+                >
+                  <Trash2 size={19} color="#e11d48" />
+                  <Text className="ml-3 text-[15px] font-semibold text-rose-600">
+                    Delete Role Account
+                  </Text>
+                </TouchableOpacity>
+              )}
+
 
 
               {/* Divider */}
@@ -614,6 +667,78 @@ export default function Index() {
                   <Text className="text-white font-semibold text-base">
                     OK
                   </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Delete Role Account Confirmation Card Modal */}
+        <Modal
+          visible={showDeleteRoleConfirm}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => !deletingRole && setShowDeleteRoleConfirm(false)}
+        >
+          <View className="flex-1 bg-black/50 justify-center items-center px-6">
+            <View className="bg-white rounded-3xl p-6 w-full max-w-sm items-center shadow-2xl border border-rose-100">
+              {/* Icon Circle */}
+              <View className="w-14 h-14 rounded-full bg-rose-100 justify-center items-center mb-4 border border-rose-200">
+                <AlertTriangle size={28} color="#e11d48" />
+              </View>
+
+              <Text className="text-xl font-bold text-slate-900 mb-1 text-center">
+                Delete Role Account
+              </Text>
+
+              <Text className="text-xs font-semibold text-rose-600 mb-3 text-center">
+                {getRoleLabel(userRole)} Account
+              </Text>
+
+              <Text className="text-xs text-slate-600 text-center mb-4 leading-relaxed">
+                Are you sure you want to permanently delete your <Text className="font-bold text-slate-800">{getRoleLabel(userRole)}</Text> account?
+              </Text>
+
+              {/* Consequence checklist */}
+              <View className="w-full bg-rose-50/70 border border-rose-200/70 rounded-2xl p-3.5 mb-5">
+                <Text className="text-[11px] font-bold text-rose-900 mb-2">
+                  The following will be permanently erased:
+                </Text>
+                <View className="gap-1.5">
+                  <Text className="text-[11px] text-rose-700">• Storefront, business profile & settings</Text>
+                  <Text className="text-[11px] text-rose-700">• All listings, products, services & deals</Text>
+                  <Text className="text-[11px] text-rose-700">• Vehicles and driver fleet registrations</Text>
+                  <Text className="text-[11px] text-rose-700">• All uploaded photos from DB & Cloudflare</Text>
+                  <Text className="text-[11px] text-emerald-700 font-medium">✓ Your login stays active as a Customer</Text>
+                </View>
+              </View>
+
+              {/* Action Buttons */}
+              <View className="flex-row items-center w-full gap-3">
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  disabled={deletingRole}
+                  onPress={() => setShowDeleteRoleConfirm(false)}
+                  className="flex-1 py-3.5 rounded-xl bg-slate-100 items-center justify-center"
+                >
+                  <Text className="text-slate-700 font-semibold text-sm">
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  disabled={deletingRole}
+                  onPress={handleDeleteRoleAccount}
+                  className="flex-1 py-3.5 rounded-xl bg-rose-600 items-center justify-center shadow-sm shadow-rose-300"
+                >
+                  {deletingRole ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <Text className="text-white font-bold text-sm">
+                      Delete Forever
+                    </Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
