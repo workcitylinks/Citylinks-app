@@ -168,14 +168,10 @@ export default function AdminDealsScreen() {
       showError('Merchant / Store name is required', 'Missing Field');
       return;
     }
-    if (!dealImage) {
-      showError('Deal banner photo is compulsory. Please take or select a photo.', 'Photo Compulsory');
-      return;
-    }
 
     try {
       setSubmitting(true);
-      const cloudflareUrl = await uploadImageToCloudflare(dealImage);
+      const cloudflareUrl = dealImage ? await uploadImageToCloudflare(dealImage) : null;
       await apiClient.post('/deals', {
         title: dealTitle.trim(),
         discount: dealDiscount.trim(),
@@ -909,7 +905,7 @@ export default function AdminDealsScreen() {
                 {/* 7. Image */}
                 <View style={{ marginBottom: 14 }}>
                   <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6 }}>
-                    Deal Photo <Text style={{ color: '#ef4444' }}>*</Text>
+                    Deal Photo <Text style={{ color: '#94a3b8', fontWeight: '500' }}>(Optional)</Text>
                   </Text>
                   {dealImage && (
                     <View style={{ height: 130, borderRadius: 12, overflow: 'hidden', marginBottom: 8, position: 'relative' }}>

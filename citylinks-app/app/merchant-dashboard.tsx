@@ -784,10 +784,6 @@ export default function MerchantDashboardScreen() {
       showError('Discount offer badge is required (e.g. 20% OFF)', 'Missing Discount');
       return;
     }
-    if (!dealImage) {
-      showError('Deal banner photo is compulsory. Please capture or select an image.', 'Photo Compulsory');
-      return;
-    }
 
     const shopName = shop?.name || `${userData?.fullName || 'My'} Store`;
     const cat = dealCategory.trim() || shop?.category || 'Shopping';
@@ -795,7 +791,7 @@ export default function MerchantDashboardScreen() {
 
     try {
       setAddingDeal(true);
-      const cloudflareUrl = await uploadImageToCloudflare(dealImage);
+      const cloudflareUrl = dealImage ? await uploadImageToCloudflare(dealImage) : null;
       await apiClient.post('/deals', {
         title: dealTitle.trim(),
         discount: dealDiscount.trim(),
@@ -2577,7 +2573,7 @@ export default function MerchantDashboardScreen() {
                 {/* 5. Deal Photo Selector */}
                 <View style={{ marginBottom: 14 }}>
                   <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6 }}>
-                    Offer Promotional Photo <Text style={{ color: '#ef4444' }}>*</Text>
+                    Offer Promotional Photo <Text style={{ color: '#94a3b8', fontWeight: '500' }}>(Optional)</Text>
                   </Text>
                   {dealImage ? (
                     <View
@@ -3235,7 +3231,7 @@ export default function MerchantDashboardScreen() {
                 {/* Deal Image Picker */}
                 <View style={{ marginBottom: 14 }}>
                   <Text style={{ fontSize: 12, fontWeight: '800', color: '#0f172a', marginBottom: 6 }}>
-                    Deal Banner Photo
+                    Deal Banner Photo <Text style={{ color: '#94a3b8', fontWeight: '500' }}>(Optional)</Text>
                   </Text>
                   <View
                     style={{
