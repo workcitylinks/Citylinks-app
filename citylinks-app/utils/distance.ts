@@ -107,32 +107,63 @@ export function formatDistance(meters: number): FormattedDistance {
 }
 
 /**
- * Resolves distance between the mobile device and a shop's coordinates.
- * Falls back gracefully to default Haveri town coordinates if shop coordinates are absent.
+ * Resolves distance between the mobile device's live GPS coordinates and a shop's coordinates.
+ * Calculates exact physical distance using the high-precision Haversine formula.
  */
 export function computeShopDistance(
   mobileCoords: { latitude: number; longitude: number } | null | undefined,
   shopLat?: number | null,
   shopLng?: number | null
 ): FormattedDistance {
-  const userLat = Number(mobileCoords?.latitude) || DEFAULT_MOBILE_COORDS.latitude;
-  const userLng = Number(mobileCoords?.longitude) || DEFAULT_MOBILE_COORDS.longitude;
-
   const parsedShopLat = Number(shopLat);
   const parsedShopLng = Number(shopLng);
 
-  const isValidCoord =
+  const isValidShopCoord =
     !isNaN(parsedShopLat) &&
     !isNaN(parsedShopLng) &&
-    parsedShopLat > 8 &&
-    parsedShopLat < 37 &&
+    parsedShopLat > 6 &&
+    parsedShopLat < 38 &&
     parsedShopLng > 68 &&
-    parsedShopLng < 97;
+    parsedShopLng < 98;
 
-  // If shop coordinates are not defined or invalid, provide a realistic nearby offset in Haveri
-  const targetLat = isValidCoord ? parsedShopLat : DEFAULT_MOBILE_COORDS.latitude + 0.0035;
-  const targetLng = isValidCoord ? parsedShopLng : DEFAULT_MOBILE_COORDS.longitude + 0.0025;
+  const userLat = Number(mobileCoords?.latitude);
+  const userLng = Number(mobileCoords?.longitude);
 
-  const meters = calculateDistanceInMeters(userLat, userLng, targetLat, targetLng);
+  const isValidUserCoord =
+    !isNaN(userLat) &&
+    !isNaN(userLng) &&
+    userLat > 6 &&
+    userLat < 38 &&
+    userLng > 68 &&
+    userLng < 98;
+
+  if (!isValidShopCoord) {
+    return {
+      meters: 999999,
+      metersText: '--',
+      kmText: '--',
+      badgeText: '--',
+      dualText: 'Location pending',
+      awayText: 'Location pending',
+      cleanText: 'Location pending',
+      shortText: '--',
+    };
+  }
+
+  // If user GPS is still acquiring, do not invent an artificial distant offset
+  if (!isValidUserCoord) {
+    return {
+      meters: 999999,
+      metersText: '--',
+      kmText: '--',
+      badgeText: '--',
+      dualText: 'Locating...',
+      awayText: 'Locating...',
+      cleanText: 'Locating...',
+      shortText: '--',
+    };
+  }
+
+  const meters = calculateDistanceInMeters(userLat, userLng, parsedShopLat, parsedShopLng);
   return formatDistance(meters);
 }
