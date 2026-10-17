@@ -26,8 +26,20 @@ export const getLocalApiUrl = () => {
 
 export const LOCAL_FALLBACK_URL = getLocalApiUrl();
 
-// Default initial Base URL based on .env
-const INITIAL_BASE_URL = process.env.EXPO_PUBLIC_API_URL || LOCAL_FALLBACK_URL;
+// Automatically resolve base URL:
+// In standalone/production APK builds (no Metro server attached or !__DEV__), ALWAYS default to PROD_API_URL (https://api.citylinks.in/api).
+export const getInitialApiUrl = (): string => {
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
+  }
+  // Standalone APK / production release has no Metro hostUri
+  if (!__DEV__ || !Constants.expoConfig?.hostUri) {
+    return PROD_API_URL;
+  }
+  return LOCAL_FALLBACK_URL;
+};
+
+const INITIAL_BASE_URL = getInitialApiUrl();
 
 export const apiClient = axios.create({
   baseURL: INITIAL_BASE_URL,
@@ -65,14 +77,18 @@ export const switchApiEnvironment = async (env: ApiEnvironment): Promise<string>
 
 // Warm up from storage override on startup
 AsyncStorage.getItem('@citylinks_api_env_override').then((saved) => {
-  if (saved === 'production') {
+  const isStandalone = !__DEV__ || !Constants.expoConfig?.hostUri;
+  if (saved === 'production' || (isStandalone && saved !== 'production')) {
     apiClient.defaults.baseURL = PROD_API_URL;
-    console.log('[CityLinks API] Restored active environment: PRODUCTION (https://api.citylinks.in/api)');
-  } else if (saved === 'local') {
+    console.log('[CityLinks API] Active environment: PRODUCTION (https://api.citylinks.in/api)');
+  } else if (saved === 'local' && __DEV__) {
     apiClient.defaults.baseURL = getLocalApiUrl();
     console.log('[CityLinks API] Restored active environment: LOCAL (', apiClient.defaults.baseURL, ')');
   } else {
-    console.log('[CityLinks API] Default connected to:', apiClient.defaults.baseURL);
+    if (isStandalone) {
+      apiClient.defaults.baseURL = PROD_API_URL;
+    }
+    console.log('[CityLinks API] Connected to:', apiClient.defaults.baseURL);
   }
 }).catch(() => {});
 

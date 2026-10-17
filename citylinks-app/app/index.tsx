@@ -1066,7 +1066,8 @@ export default function Index() {
                         flex: 1,
                         backgroundColor: '#ffffff',
                         borderRadius: 20,
-                        padding: 14,
+                        paddingVertical: 14,
+                        paddingHorizontal: 10,
                         borderWidth: 1,
                         borderColor: '#e2e8f0',
                         shadowColor: '#000',
@@ -1077,8 +1078,8 @@ export default function Index() {
                     >
                       <View
                         style={{
-                          width: 42,
-                          height: 42,
+                          width: 40,
+                          height: 40,
                           borderRadius: 14,
                           backgroundColor: '#eff6ff',
                           alignItems: 'center',
@@ -1088,7 +1089,12 @@ export default function Index() {
                       >
                         <UserPlus size={20} color="#2563eb" />
                       </View>
-                      <Text style={{ fontSize: 14, fontWeight: '700', color: '#0f172a' }} numberOfLines={1}>
+                      <Text
+                        style={{ fontSize: 13, fontWeight: '700', color: '#0f172a' }}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit={true}
+                        minimumFontScale={0.85}
+                      >
                         Join us
                       </Text>
                       <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }} numberOfLines={1}>
@@ -1103,7 +1109,8 @@ export default function Index() {
                         flex: 1,
                         backgroundColor: '#ffffff',
                         borderRadius: 20,
-                        padding: 14,
+                        paddingVertical: 14,
+                        paddingHorizontal: 10,
                         borderWidth: 1,
                         borderColor: '#e0e7ff',
                         shadowColor: '#4f46e5',
@@ -1114,8 +1121,8 @@ export default function Index() {
                     >
                       <View
                         style={{
-                          width: 42,
-                          height: 42,
+                          width: 40,
+                          height: 40,
                           borderRadius: 14,
                           backgroundColor: '#eef2ff',
                           alignItems: 'center',
@@ -1125,7 +1132,12 @@ export default function Index() {
                       >
                         <LayoutDashboard size={20} color="#4f46e5" />
                       </View>
-                      <Text style={{ fontSize: 14, fontWeight: '700', color: '#0f172a' }} numberOfLines={1}>
+                      <Text
+                        style={{ fontSize: 13, fontWeight: '700', color: '#0f172a' }}
+                        numberOfLines={1}
+                        adjustsFontSizeToFit={true}
+                        minimumFontScale={0.85}
+                      >
                         Dashboard
                       </Text>
                       <Text style={{ fontSize: 11, color: '#4f46e5', fontWeight: '600', marginTop: 2 }} numberOfLines={1}>
@@ -1142,7 +1154,8 @@ export default function Index() {
                       flex: 1,
                       backgroundColor: '#ffffff',
                       borderRadius: 20,
-                      padding: 14,
+                      paddingVertical: 14,
+                      paddingHorizontal: 10,
                       borderWidth: 1,
                       borderColor: cartCount > 0 ? '#bfdbfe' : '#e2e8f0',
                       shadowColor: '#000',
@@ -1174,8 +1187,8 @@ export default function Index() {
                     )}
                     <View
                       style={{
-                        width: 42,
-                        height: 42,
+                        width: 40,
+                        height: 40,
                         borderRadius: 14,
                         backgroundColor: '#f0fdf4',
                         alignItems: 'center',
@@ -1185,7 +1198,12 @@ export default function Index() {
                     >
                       <ShoppingCart size={20} color="#16a34a" />
                     </View>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#0f172a' }} numberOfLines={1}>
+                    <Text
+                      style={{ fontSize: 13, fontWeight: '700', color: '#0f172a' }}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit={true}
+                      minimumFontScale={0.85}
+                    >
                       Cart
                     </Text>
                     <Text
@@ -1209,7 +1227,8 @@ export default function Index() {
                       flex: 1,
                       backgroundColor: '#ffffff',
                       borderRadius: 20,
-                      padding: 14,
+                      paddingVertical: 14,
+                      paddingHorizontal: 10,
                       borderWidth: 1,
                       borderColor: unreadNotificationsCount > 0 ? '#fecaca' : '#e2e8f0',
                       shadowColor: '#000',
@@ -1241,8 +1260,8 @@ export default function Index() {
                     )}
                     <View
                       style={{
-                        width: 42,
-                        height: 42,
+                        width: 40,
+                        height: 40,
                         borderRadius: 14,
                         backgroundColor: '#fef2f2',
                         alignItems: 'center',
@@ -1252,8 +1271,13 @@ export default function Index() {
                     >
                       <Bell size={20} color="#dc2626" />
                     </View>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#0f172a' }} numberOfLines={1}>
-                      Notification
+                    <Text
+                      style={{ fontSize: 13, fontWeight: '700', color: '#0f172a' }}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit={true}
+                      minimumFontScale={0.8}
+                    >
+                      Notifications
                     </Text>
                     <Text
                       style={{
