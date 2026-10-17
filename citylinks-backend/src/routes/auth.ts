@@ -931,6 +931,397 @@ router.put('/profile', authenticateToken, async (req: any, res) => {
   }
 });
 
+// DELETE /api/auth/role-account - Permanently deletes role profile, shop, products, services, vehicles, deals, and Cloudflare images
+router.delete('/role-account', authenticateToken, async (req: any, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Check if user exists
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const targetRole = (req.body?.role || user.role) as string;
+
+    // Reject if attempting to delete Super Admin
+    if (user.role === 'SUPER_ADMIN' || targetRole === 'SUPER_ADMIN') {
+      return res.status(403).json({ error: 'Super Admin account cannot be deleted via role removal.' });
+    }
+
+    if (user.role === 'CUSTOMER' && targetRole === 'CUSTOMER') {
+      return res.status(400).json({ error: 'Customer accounts do not have a specialized role to delete.' });
+    }
+
+    const imagesToDelete: (string | null | undefined)[] = [];
+
+    if (targetRole === 'MERCHANT') {
+      // 1. Collect Join Requests & their images
+      const joinRequests = await prisma.joinRequest.findMany({
+        where: { userId, role: 'MERCHANT' },
+      });
+      for (const jr of joinRequests) {
+        if (jr.imageUrl) imagesToDelete.push(jr.imageUrl);
+        if (jr.aadhaarPhoto) imagesToDelete.push(jr.aadhaarPhoto);
+        if (jr.drivingLicensePhoto) imagesToDelete.push(jr.drivingLicensePhoto);
+      }
+      const shopNamesFromJr = joinRequests.map((j) => j.shopName?.trim()).filter(Boolean) as string[];
+
+      // 2. Find all Shops associated with this merchant
+      const shopOrConditions: any[] = [];
+      if (user.email) {
+        shopOrConditions.push({ email: { equals: user.email.trim(), mode: 'insensitive' } });
+      }
+      if (user.phone && user.phone.trim().length > 0) {
+        shopOrConditions.push({ phone: user.phone.trim() });
+      }
+      for (const sName of shopNamesFromJr) {
+        shopOrConditions.push({ name: { equals: sName, mode: 'insensitive' } });
+      }
+      const defaultStoreName = `${user.fullName || user.firstName || 'My'} Store`.trim();
+      shopOrConditions.push({ name: { equals: defaultStoreName, mode: 'insensitive' } });
+
+      const shops = await prisma.shop.findMany({
+        where: { OR: shopOrConditions },
+        include: { products: true },
+      });
+
+      for (const shop of shops) {
+        if (shop.imageUrl) imagesToDelete.push(shop.imageUrl);
+
+        // Products
+        const productIds = shop.products.map((p) => p.id);
+        for (const prod of shop.products) {
+          if (prod.imageUrl) imagesToDelete.push(prod.imageUrl);
+        }
+
+        if (productIds.length > 0) {
+          // Delete CartItems referencing these products
+          await prisma.cartItem.deleteMany({
+            where: { productId: { in: productIds } },
+          }).catch(() => {});
+
+          // Delete Marketplace Items for these products
+          await prisma.marketplaceItem.deleteMany({
+            where: { entity_type: 'product', entity_id: { in: productIds } },
+          }).catch(() => {});
+
+          // Delete Products
+          await prisma.product.deleteMany({
+            where: { id: { in: productIds } },
+          }).catch(() => {});
+        }
+
+        // Delete Marketplace Item for this Shop
+        await prisma.marketplaceItem.deleteMany({
+          where: { entity_type: 'shop', entity_id: shop.id },
+        }).catch(() => {});
+
+        // Delete Deals matching this shop name or shop linkUrl
+        const deals = await prisma.deal.findMany({
+          where: {
+            OR: [
+              { merchantName: { equals: shop.name.trim(), mode: 'insensitive' } },
+              { linkUrl: { contains: shop.id } },
+            ],
+          },
+        });
+        for (const d of deals) {
+          if (d.imageUrl) imagesToDelete.push(d.imageUrl);
+        }
+        if (deals.length > 0) {
+          await prisma.deal.deleteMany({
+            where: { id: { in: deals.map((d) => d.id) } },
+          }).catch(() => {});
+        }
+
+        // Delete orders belonging to this shop
+        await prisma.order.deleteMany({
+          where: { shopId: shop.id },
+        }).catch(() => {});
+
+        // Delete the shop
+        await prisma.shop.delete({
+          where: { id: shop.id },
+        }).catch(() => {});
+      }
+
+      // Check any other deals created under user's name
+      const remainingDeals = await prisma.deal.findMany({
+        where: {
+          merchantName: {
+            in: [user.fullName || '', defaultStoreName, ...shopNamesFromJr].filter(Boolean) as string[],
+            mode: 'insensitive',
+          },
+        },
+      });
+      for (const d of remainingDeals) {
+        if (d.imageUrl) imagesToDelete.push(d.imageUrl);
+      }
+      if (remainingDeals.length > 0) {
+        await prisma.deal.deleteMany({
+          where: { id: { in: remainingDeals.map((d) => d.id) } },
+        }).catch(() => {});
+      }
+
+      // Delete Merchant Join Requests
+      await prisma.joinRequest.deleteMany({
+        where: { userId, role: 'MERCHANT' },
+      }).catch(() => {});
+    } else if (targetRole === 'MANUAL_SERVICE_PROVIDER') {
+      // 1. Collect Join Requests & images
+      const joinRequests = await prisma.joinRequest.findMany({
+        where: {
+          userId,
+          role: 'MANUAL_SERVICE_PROVIDER',
+        },
+      });
+      for (const jr of joinRequests) {
+        if (jr.imageUrl) imagesToDelete.push(jr.imageUrl);
+        if (jr.aadhaarPhoto) imagesToDelete.push(jr.aadhaarPhoto);
+        if (jr.drivingLicensePhoto) imagesToDelete.push(jr.drivingLicensePhoto);
+      }
+      const providerNamesFromJr = joinRequests.map((j) => j.shopName?.trim()).filter(Boolean) as string[];
+
+      const providerNames = Array.from(
+        new Set([
+          user.fullName || '',
+          `${user.fullName || ''} Services`.trim(),
+          'My Technical Services',
+          ...providerNamesFromJr,
+        ])
+      ).filter((n) => n.length > 1);
+
+      // 2. Find services
+      const serviceOrConditions: any[] = [];
+      if (user.phone && user.phone.trim().length > 0) {
+        serviceOrConditions.push({ phone: user.phone.trim() });
+      }
+      for (const pName of providerNames) {
+        serviceOrConditions.push({ providerName: { equals: pName, mode: 'insensitive' } });
+      }
+
+      const services = serviceOrConditions.length > 0
+        ? await prisma.service.findMany({ where: { OR: serviceOrConditions } })
+        : [];
+
+      for (const s of services) {
+        if (s.imageUrl) imagesToDelete.push(s.imageUrl);
+        await prisma.marketplaceItem.deleteMany({
+          where: { entity_type: 'service', entity_id: s.id },
+        }).catch(() => {});
+      }
+      if (services.length > 0) {
+        await prisma.service.deleteMany({
+          where: { id: { in: services.map((s) => s.id) } },
+        }).catch(() => {});
+      }
+
+      // Deals
+      const deals = await prisma.deal.findMany({
+        where: {
+          merchantName: { in: providerNames, mode: 'insensitive' },
+        },
+      });
+      for (const d of deals) {
+        if (d.imageUrl) imagesToDelete.push(d.imageUrl);
+      }
+      if (deals.length > 0) {
+        await prisma.deal.deleteMany({
+          where: { id: { in: deals.map((d) => d.id) } },
+        }).catch(() => {});
+      }
+
+      // Delete Join Requests
+      await prisma.joinRequest.deleteMany({
+        where: {
+          userId,
+          role: 'MANUAL_SERVICE_PROVIDER',
+        },
+      }).catch(() => {});
+    } else if (targetRole === 'DIGITAL_SERVICE_PROVIDER') {
+      // 1. Collect Join Requests & images
+      const joinRequests = await prisma.joinRequest.findMany({
+        where: {
+          userId,
+          role: 'DIGITAL_SERVICE_PROVIDER',
+        },
+      });
+      for (const jr of joinRequests) {
+        if (jr.imageUrl) imagesToDelete.push(jr.imageUrl);
+        if (jr.aadhaarPhoto) imagesToDelete.push(jr.aadhaarPhoto);
+      }
+      const specialistNamesFromJr = joinRequests.map((j) => j.shopName?.trim()).filter(Boolean) as string[];
+
+      const specialistNames = Array.from(
+        new Set([
+          user.fullName || '',
+          `${user.fullName || ''} Digital Studio`.trim(),
+          'My Digital Solutions',
+          ...specialistNamesFromJr,
+        ])
+      ).filter((n) => n.length > 1);
+
+      // 2. Find digital services
+      const digitalOrConditions: any[] = [];
+      if (user.phone && user.phone.trim().length > 0) {
+        digitalOrConditions.push({ phone: user.phone.trim() });
+      }
+      for (const sName of specialistNames) {
+        digitalOrConditions.push({ name: { equals: sName, mode: 'insensitive' } });
+      }
+
+      const digitalProviders = digitalOrConditions.length > 0
+        ? await prisma.digitalServiceProvider.findMany({ where: { OR: digitalOrConditions } })
+        : [];
+
+      for (const dp of digitalProviders) {
+        if (dp.imageUrl) imagesToDelete.push(dp.imageUrl);
+        await prisma.marketplaceItem.deleteMany({
+          where: { entity_id: dp.id },
+        }).catch(() => {});
+      }
+      if (digitalProviders.length > 0) {
+        await prisma.digitalServiceProvider.deleteMany({
+          where: { id: { in: digitalProviders.map((dp) => dp.id) } },
+        }).catch(() => {});
+      }
+
+      // Deals
+      const deals = await prisma.deal.findMany({
+        where: {
+          merchantName: { in: specialistNames, mode: 'insensitive' },
+        },
+      });
+      for (const d of deals) {
+        if (d.imageUrl) imagesToDelete.push(d.imageUrl);
+      }
+      if (deals.length > 0) {
+        await prisma.deal.deleteMany({
+          where: { id: { in: deals.map((d) => d.id) } },
+        }).catch(() => {});
+      }
+
+      // Delete Join Requests
+      await prisma.joinRequest.deleteMany({
+        where: {
+          userId,
+          role: 'DIGITAL_SERVICE_PROVIDER',
+        },
+      }).catch(() => {});
+    } else if (targetRole === 'TRANSPORT') {
+      // 1. Collect Join Requests & images
+      const joinRequests = await prisma.joinRequest.findMany({
+        where: { userId, role: 'TRANSPORT' },
+      });
+      for (const jr of joinRequests) {
+        if (jr.imageUrl) imagesToDelete.push(jr.imageUrl);
+        if (jr.drivingLicensePhoto) imagesToDelete.push(jr.drivingLicensePhoto);
+        if (jr.aadhaarPhoto) imagesToDelete.push(jr.aadhaarPhoto);
+      }
+
+      // 2. Find TransportProvider
+      const transportOrConditions: any[] = [{ userId }];
+      if (user.phone && user.phone.trim().length > 0) {
+        transportOrConditions.push({ phone: user.phone.trim() });
+      }
+
+      const transportProviders = await prisma.transportProvider.findMany({
+        where: { OR: transportOrConditions },
+        include: { vehicles: true },
+      });
+
+      for (const tp of transportProviders) {
+        if (tp.drivingLicensePhoto) imagesToDelete.push(tp.drivingLicensePhoto);
+        if (tp.aadhaarPhoto) imagesToDelete.push(tp.aadhaarPhoto);
+
+        // Delete DriverVehicles
+        await prisma.driverVehicle.deleteMany({
+          where: { driverId: tp.id },
+        }).catch(() => {});
+
+        // Delete Marketplace Items
+        await prisma.marketplaceItem.deleteMany({
+          where: { entity_id: tp.id },
+        }).catch(() => {});
+
+        // Delete Ride Bookings
+        await prisma.rideBooking.deleteMany({
+          where: { driverId: tp.id },
+        }).catch(() => {});
+      }
+
+      if (transportProviders.length > 0) {
+        await prisma.transportProvider.deleteMany({
+          where: { id: { in: transportProviders.map((tp) => tp.id) } },
+        }).catch(() => {});
+      }
+
+      // Delete any driver vehicles linked directly to userId
+      await prisma.driverVehicle.deleteMany({
+        where: { userId },
+      }).catch(() => {});
+
+      // Delete Join Requests
+      await prisma.joinRequest.deleteMany({
+        where: { userId, role: 'TRANSPORT' },
+      }).catch(() => {});
+    }
+
+    // Permanently wipe all collected images from Cloudflare
+    await deleteMultipleCloudflareImages(imagesToDelete);
+
+    // Revert user role to CUSTOMER
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { role: 'CUSTOMER' },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        address: true,
+        aadhaarNumber: true,
+        panNumber: true,
+        role: true,
+        avatarUrl: true,
+        isVerified: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    // Issue a refreshed JWT token with the new CUSTOMER role
+    const newToken = jwt.sign(
+      {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        role: updatedUser.role,
+      },
+      JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+
+    // Invalidate caches
+    invalidateCache();
+    invalidateCache(`user:${userId}`);
+
+    console.log(`[Role Account Deleted] User ${userId} (${user.email}) deleted role ${targetRole}. Cloudflare images deleted: ${imagesToDelete.length}. Role reverted to CUSTOMER.`);
+
+    res.json({
+      success: true,
+      message: `${targetRole} role account and all associated details have been permanently deleted.`,
+      user: updatedUser,
+      token: newToken,
+    });
+  } catch (err: any) {
+    console.error('Error deleting role account:', err);
+    res.status(500).json({ error: err.message || 'Failed to delete role account' });
+  }
+});
+
 // DELETE /api/auth/account - Permanently deletes the user and all their details
 router.delete('/account', authenticateToken, async (req: any, res) => {
   try {
