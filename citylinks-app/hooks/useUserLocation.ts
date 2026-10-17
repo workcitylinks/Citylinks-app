@@ -1,21 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DEFAULT_MOBILE_COORDS } from '../utils/distance';
+import { DEFAULT_MOBILE_COORDS, calculateDistanceInMeters } from '../utils/distance';
 
 const LOCATION_CACHE_KEY = '@citylinks_cached_user_location';
 const LOCATION_MODE_KEY = '@citylinks_location_mode';
 const LOCATION_CACHE_TTL = 10 * 60 * 1000; // 10 minutes TTL
-
-// Fast in-memory cached location object for immediate synchronous return
-let memoryLocationCache: {
-  coords: { latitude: number; longitude: number };
-  locality: string;
-  isLiveGPS: boolean;
-  timestamp: number;
-} | null = null;
-
-let currentModeCache: 'live' | 'haveri' = 'live';
 
 export interface MobileLocationState {
   coords: { latitude: number; longitude: number };
@@ -24,6 +14,10 @@ export interface MobileLocationState {
   locality: string;
   error: string | null;
   mode: 'live' | 'haveri';
+  rawDeviceCoords: { latitude: number; longitude: number } | null;
+  rawDeviceLocality: string | null;
+  isOutsideHaveri: boolean;
+  distanceFromHaveri: number;
   refreshLocation: () => Promise<void>;
   switchToHaveri: () => void;
   switchToLiveGPS: () => Promise<void>;
@@ -31,62 +25,21 @@ export interface MobileLocationState {
 }
 
 export function useUserLocation(): MobileLocationState {
-  const [mode, setMode] = useState<'live' | 'haveri'>(currentModeCache);
-  const [coords, setCoords] = useState<{ latitude: number; longitude: number }>(
-    currentModeCache === 'haveri'
-      ? DEFAULT_MOBILE_COORDS
-      : memoryLocationCache ? memoryLocationCache.coords : DEFAULT_MOBILE_COORDS
-  );
-  const [isLiveGPS, setIsLiveGPS] = useState<boolean>(
-    currentModeCache === 'haveri'
-      ? false
-      : memoryLocationCache ? memoryLocationCache.isLiveGPS : false
-  );
-  const [loading, setLoading] = useState<boolean>(!memoryLocationCache && currentModeCache === 'live');
-  const [locality, setLocality] = useState<string>(
-    currentModeCache === 'haveri'
-      ? 'Haveri'
-      : memoryLocationCache ? memoryLocationCache.locality : 'Haveri'
-  );
+  // By default, reference Haveri Town Center so local shop distances and nearest sorting are accurate
+  const [coords, setCoords] = useState<{ latitude: number; longitude: number }>(DEFAULT_MOBILE_COORDS);
+  const [isLiveGPS, setIsLiveGPS] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [locality, setLocality] = useState<string>('Haveri Town');
+  const [mode, setMode] = useState<'live' | 'haveri'>('haveri');
   const [error, setError] = useState<string | null>(null);
 
-  // Initialize stored mode on mount
-  useEffect(() => {
-    AsyncStorage.getItem(LOCATION_MODE_KEY).then((savedMode) => {
-      if (savedMode === 'haveri') {
-        currentModeCache = 'haveri';
-        setMode('haveri');
-        setCoords(DEFAULT_MOBILE_COORDS);
-        setLocality('Haveri');
-        setIsLiveGPS(false);
-        setLoading(false);
-      }
-    }).catch(() => {});
-  }, []);
+  // Raw physical device readings
+  const [rawDeviceCoords, setRawDeviceCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [rawDeviceLocality, setRawDeviceLocality] = useState<string | null>(null);
+  const [isOutsideHaveri, setIsOutsideHaveri] = useState<boolean>(false);
+  const [distanceFromHaveri, setDistanceFromHaveri] = useState<number>(0);
 
   const fetchLocation = useCallback(async (forceRefresh = false) => {
-    // If user explicitly chose Haveri Center mode, do not poll device GPS
-    if (!forceRefresh && currentModeCache === 'haveri') {
-      setCoords(DEFAULT_MOBILE_COORDS);
-      setLocality('Haveri');
-      setIsLiveGPS(false);
-      setLoading(false);
-      return;
-    }
-
-    // If we have fresh in-memory cache and not forcing refresh, return immediately
-    if (
-      !forceRefresh &&
-      memoryLocationCache &&
-      Date.now() - memoryLocationCache.timestamp < LOCATION_CACHE_TTL
-    ) {
-      setCoords(memoryLocationCache.coords);
-      setLocality(memoryLocationCache.locality);
-      setIsLiveGPS(memoryLocationCache.isLiveGPS);
-      setLoading(false);
-      return;
-    }
-
     try {
       setLoading(true);
       setError(null);
@@ -99,17 +52,12 @@ export function useUserLocation(): MobileLocationState {
 
       if (!perm || perm.status !== 'granted') {
         setIsLiveGPS(false);
-        setError('Location permission not granted. Showing Haveri city center.');
+        setError('Location permission not granted. Defaulting to Haveri city center.');
         setCoords(DEFAULT_MOBILE_COORDS);
-        setLocality('Haveri Center');
+        setLocality('Haveri Town');
+        setMode('haveri');
         setLoading(false);
         return;
-      }
-
-      // Check if hardware location services are enabled on the device
-      const servicesEnabled = await Location.hasServicesEnabledAsync().catch(() => true);
-      if (!servicesEnabled) {
-        setError('Device GPS is turned off. Please turn on Location in settings.');
       }
 
       // High-accuracy live position lookup directly from GPS hardware
@@ -118,13 +66,13 @@ export function useUserLocation(): MobileLocationState {
         currentPosition = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.High,
         });
-      } catch (highErr) {
-        // Fall back to balanced accuracy or last known position if satellite lock is unavailable indoors
+      } catch {
+        // Fallback to balanced accuracy or last known position if indoor GPS satellite lock is unavailable
         try {
           currentPosition = await Location.getCurrentPositionAsync({
             accuracy: Location.Accuracy.Balanced,
           });
-        } catch (balancedErr) {
+        } catch {
           try {
             currentPosition = await Location.getLastKnownPositionAsync();
           } catch {}
@@ -133,65 +81,87 @@ export function useUserLocation(): MobileLocationState {
 
       if (currentPosition?.coords) {
         const { latitude, longitude } = currentPosition.coords;
-        setCoords({ latitude, longitude });
-        setIsLiveGPS(true);
+        const distMeters = calculateDistanceInMeters(
+          latitude,
+          longitude,
+          DEFAULT_MOBILE_COORDS.latitude,
+          DEFAULT_MOBILE_COORDS.longitude
+        );
 
-        // Reverse geocode to get clean locality name
-        let detectedLocality = 'Haveri';
+        let detectedLocality = 'Nearby';
         try {
           const [geo] = await Location.reverseGeocodeAsync({ latitude, longitude });
           if (geo) {
-            let loc = geo.city || geo.district || geo.subregion || geo.street || 'Nearby';
-            // Strip administrative revenue suffixes like "Division"
+            let loc = geo.city || geo.subregion || geo.district || geo.street || 'Nearby';
             loc = loc.replace(/\s+division$/i, '').trim();
-            detectedLocality = loc || 'Your Location';
+            detectedLocality = loc || 'Nearby';
           }
         } catch {
           detectedLocality = 'Your Location';
         }
-        setLocality(detectedLocality);
 
-        // Cache in memory and AsyncStorage
-        const cacheObj = {
-          coords: { latitude, longitude },
-          locality: detectedLocality,
-          isLiveGPS: true,
-          timestamp: Date.now(),
-        };
-        memoryLocationCache = cacheObj;
-        AsyncStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify(cacheObj)).catch(() => {});
+        setRawDeviceCoords({ latitude, longitude });
+        setRawDeviceLocality(detectedLocality);
+        setDistanceFromHaveri(distMeters);
+
+        const isFar = distMeters > 35000; // > 35 km away from Haveri (e.g. Mysore, Bangalore, remote telecom tower)
+        setIsOutsideHaveri(isFar);
+
+        // Check if user has explicitly stored a preference
+        const savedMode = await AsyncStorage.getItem(LOCATION_MODE_KEY).catch(() => null);
+
+        if (savedMode === 'live' || (!isFar && savedMode !== 'haveri')) {
+          // Device is physically in Haveri (< 35km) or user explicitly chose live GPS
+          setCoords({ latitude, longitude });
+          setLocality(detectedLocality || 'Haveri');
+          setIsLiveGPS(true);
+          setMode('live');
+        } else {
+          // Device is outside Haveri (e.g. Mysore, Bangalore, or remote telecom tower).
+          // Default reference to Haveri Town Center so all local shops show accurate nearby distance (40m - 600m)!
+          setCoords(DEFAULT_MOBILE_COORDS);
+          setLocality('Haveri Town');
+          setIsLiveGPS(false);
+          setMode('haveri');
+        }
       } else {
-        setIsLiveGPS(false);
         setCoords(DEFAULT_MOBILE_COORDS);
-        setLocality('Haveri Center');
+        setLocality('Haveri Town');
+        setIsLiveGPS(false);
+        setMode('haveri');
       }
     } catch (err: any) {
       console.warn('GPS location lookup error:', err);
       setIsLiveGPS(false);
       setError(err?.message || 'Could not fetch device location');
       setCoords(DEFAULT_MOBILE_COORDS);
-      setLocality('Haveri Center');
+      setLocality('Haveri Town');
+      setMode('haveri');
     } finally {
       setLoading(false);
     }
   }, []);
 
   const switchToHaveri = useCallback(() => {
-    currentModeCache = 'haveri';
-    setMode('haveri');
     setCoords(DEFAULT_MOBILE_COORDS);
-    setLocality('Haveri');
+    setLocality('Haveri Town');
     setIsLiveGPS(false);
+    setMode('haveri');
     AsyncStorage.setItem(LOCATION_MODE_KEY, 'haveri').catch(() => {});
   }, []);
 
   const switchToLiveGPS = useCallback(async () => {
-    currentModeCache = 'live';
-    setMode('live');
-    memoryLocationCache = null;
-    AsyncStorage.setItem(LOCATION_MODE_KEY, 'live').catch(() => {});
-    await fetchLocation(true);
-  }, [fetchLocation]);
+    if (rawDeviceCoords) {
+      setCoords(rawDeviceCoords);
+      setLocality(rawDeviceLocality || 'Live GPS');
+      setIsLiveGPS(true);
+      setMode('live');
+      AsyncStorage.setItem(LOCATION_MODE_KEY, 'live').catch(() => {});
+    } else {
+      AsyncStorage.setItem(LOCATION_MODE_KEY, 'live').catch(() => {});
+      await fetchLocation(true);
+    }
+  }, [rawDeviceCoords, rawDeviceLocality, fetchLocation]);
 
   const toggleMode = useCallback(async () => {
     if (mode === 'live') {
@@ -212,6 +182,10 @@ export function useUserLocation(): MobileLocationState {
     locality,
     error,
     mode,
+    rawDeviceCoords,
+    rawDeviceLocality,
+    isOutsideHaveri,
+    distanceFromHaveri,
     refreshLocation: () => fetchLocation(true),
     switchToHaveri,
     switchToLiveGPS,

@@ -77,20 +77,11 @@ export default function NearbyShopsScreen() {
     mode: locationMode,
     switchToHaveri,
     switchToLiveGPS,
+    rawDeviceLocality,
+    isOutsideHaveri,
   } = useUserLocation();
 
   const [showLocationModal, setShowLocationModal] = useState(false);
-
-  const distanceFromHaveri = useMemo(() => {
-    return calculateDistanceInMeters(
-      mobileCoords.latitude,
-      mobileCoords.longitude,
-      DEFAULT_MOBILE_COORDS.latitude,
-      DEFAULT_MOBILE_COORDS.longitude
-    );
-  }, [mobileCoords]);
-
-  const isFarFromHaveri = distanceFromHaveri > 50000;
 
   // Sync when route parameters change
   useEffect(() => {
@@ -155,7 +146,14 @@ export default function NearbyShopsScreen() {
     });
 
     if (sortByNearest) {
-      list.sort((a, b) => a.distance.meters - b.distance.meters);
+      list.sort((a, b) => {
+        if (a.distance.meters !== b.distance.meters) {
+          return a.distance.meters - b.distance.meters;
+        }
+        if (a.isSponsored && !b.isSponsored) return -1;
+        if (!a.isSponsored && b.isSponsored) return 1;
+        return (a.name || '').localeCompare(b.name || '');
+      });
     }
     return list;
   }, [filteredShops, mobileCoords, sortByNearest]);
@@ -255,24 +253,42 @@ export default function NearbyShopsScreen() {
             )}
           </View>
 
-          {/* Hint bar if user is far from Haveri */}
-          {isFarFromHaveri && locationMode === 'live' && (
+          {/* Subtle indicator if user device GPS is in another city */}
+          {isOutsideHaveri && locationMode === 'haveri' && (
+            <View className="mb-2 bg-emerald-50/90 border border-emerald-200/80 rounded-xl px-3 py-2 flex-row items-center justify-between">
+              <View className="flex-row items-center flex-1 mr-2">
+                <MapPin size={13} color="#059669" />
+                <Text className="text-[11px] text-emerald-900 ml-1.5 flex-1" numberOfLines={1}>
+                  Showing stores from <Text className="font-bold">Haveri Town Hub</Text> (Nearest first).
+                </Text>
+              </View>
+              <TouchableOpacity
+                activeOpacity={0.75}
+                onPress={() => setShowLocationModal(true)}
+                className="bg-emerald-600 px-2.5 py-1 rounded-md"
+              >
+                <Text className="text-[10px] font-bold text-white">Options</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {isOutsideHaveri && locationMode === 'live' && (
             <View className="mb-2 bg-blue-50/90 border border-blue-200/80 rounded-xl px-3 py-2 flex-row items-center justify-between">
               <View className="flex-row items-center flex-1 mr-2">
                 <MapPin size={13} color="#2563eb" />
                 <Text className="text-[11px] text-blue-900 ml-1.5 flex-1" numberOfLines={1}>
-                  GPS detected <Text className="font-bold">{locality}</Text> (~{Math.round(distanceFromHaveri / 1000)} km away).
+                  GPS reading: <Text className="font-bold">{rawDeviceLocality || locality}</Text>.
                 </Text>
               </View>
               <TouchableOpacity
                 activeOpacity={0.75}
                 onPress={() => {
                   switchToHaveri();
-                  showSuccess('Switched to Haveri Town Center', 'Local View');
+                  showSuccess('Switched to Haveri Town Center', 'Local View Active');
                 }}
                 className="bg-blue-600 px-2.5 py-1 rounded-md"
               >
-                <Text className="text-[10px] font-bold text-white">Use Haveri</Text>
+                <Text className="text-[10px] font-bold text-white">Use Haveri Hub</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -518,15 +534,49 @@ export default function NearbyShopsScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Option 1: Live Device GPS */}
+            {/* Option 1: Haveri Town Center (Default for local city viewing) */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => {
+                setShowLocationModal(false);
+                switchToHaveri();
+                showSuccess('Set reference to Haveri Town Center', 'Local View Active');
+              }}
+              className={`p-3.5 rounded-2xl mb-2.5 border flex-row items-center justify-between ${
+                locationMode === 'haveri'
+                  ? 'bg-blue-50/70 border-blue-500'
+                  : 'bg-slate-50/80 border-slate-200'
+              }`}
+            >
+              <View className="flex-row items-center flex-1 mr-2">
+                <View className="w-9 h-9 rounded-xl bg-emerald-100 items-center justify-center mr-3">
+                  <Store size={18} color="#059669" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-sm font-bold text-slate-900">
+                    Haveri Town (Default Hub)
+                  </Text>
+                  <Text className="text-[11px] text-slate-500 mt-0.5">
+                    CityLinks commercial center (Shows stores from 40m - 600m)
+                  </Text>
+                </View>
+              </View>
+              {locationMode === 'haveri' && (
+                <View className="w-6 h-6 rounded-full bg-blue-600 items-center justify-center">
+                  <Check size={14} color="#ffffff" />
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* Option 2: Live Device GPS */}
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={async () => {
                 setShowLocationModal(false);
                 await switchToLiveGPS();
-                showSuccess(`Using live GPS (${locality})`, 'Live GPS Active');
+                showSuccess(`Using live GPS (${rawDeviceLocality || locality})`, 'Live GPS Active');
               }}
-              className={`p-3.5 rounded-2xl mb-2.5 border flex-row items-center justify-between ${
+              className={`p-3.5 rounded-2xl mb-4 border flex-row items-center justify-between ${
                 locationMode === 'live'
                   ? 'bg-blue-50/70 border-blue-500'
                   : 'bg-slate-50/80 border-slate-200'
@@ -546,45 +596,11 @@ export default function NearbyShopsScreen() {
                     )}
                   </View>
                   <Text className="text-[11px] text-slate-500 mt-0.5" numberOfLines={1}>
-                    Detected: <Text className="font-semibold text-slate-700">{locality}</Text>
+                    Reading: <Text className="font-semibold text-slate-700">{rawDeviceLocality || locality}</Text>
                   </Text>
                 </View>
               </View>
               {locationMode === 'live' && (
-                <View className="w-6 h-6 rounded-full bg-blue-600 items-center justify-center">
-                  <Check size={14} color="#ffffff" />
-                </View>
-              )}
-            </TouchableOpacity>
-
-            {/* Option 2: Haveri Town Center (Default for local city viewing) */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => {
-                setShowLocationModal(false);
-                switchToHaveri();
-                showSuccess('Set reference to Haveri Town Center', 'Local View Active');
-              }}
-              className={`p-3.5 rounded-2xl mb-4 border flex-row items-center justify-between ${
-                locationMode === 'haveri'
-                  ? 'bg-blue-50/70 border-blue-500'
-                  : 'bg-slate-50/80 border-slate-200'
-              }`}
-            >
-              <View className="flex-row items-center flex-1 mr-2">
-                <View className="w-9 h-9 rounded-xl bg-emerald-100 items-center justify-center mr-3">
-                  <Store size={18} color="#059669" />
-                </View>
-                <View className="flex-1">
-                  <Text className="text-sm font-bold text-slate-900">
-                    Haveri Town (Default)
-                  </Text>
-                  <Text className="text-[11px] text-slate-500 mt-0.5">
-                    Haveri commercial hub (0 - 5 km walking/drive)
-                  </Text>
-                </View>
-              </View>
-              {locationMode === 'haveri' && (
                 <View className="w-6 h-6 rounded-full bg-blue-600 items-center justify-center">
                   <Check size={14} color="#ffffff" />
                 </View>
