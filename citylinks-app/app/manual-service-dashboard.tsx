@@ -41,6 +41,7 @@ import {
   Maximize2,
   Camera,
   Image as ImageIcon,
+  Pencil,
 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
@@ -122,6 +123,129 @@ export default function ManualServiceDashboardScreen() {
     badge: string;
     price: string;
   } | null>(null);
+
+  // Photo Edit State for Services & Deals
+  const [photoActionModalOpen, setPhotoActionModalOpen] = useState(false);
+  const [targetPhotoService, setTargetPhotoService] = useState<ServiceItem | null>(null);
+  const [targetPhotoDeal, setTargetPhotoDeal] = useState<DealItem | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  const handleOpenServicePhotoAction = (svc: ServiceItem) => {
+    setTargetPhotoService(svc);
+    setTargetPhotoDeal(null);
+    setPhotoActionModalOpen(true);
+  };
+
+  const handleOpenDealPhotoAction = (deal: DealItem) => {
+    setTargetPhotoDeal(deal);
+    setTargetPhotoService(null);
+    setPhotoActionModalOpen(true);
+  };
+
+  const handlePickTargetPhoto = async (source: 'camera' | 'gallery') => {
+    try {
+      if (source === 'camera') {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+          showError('Camera permission is required', 'Permission Denied');
+          return;
+        }
+        const result = await ImagePicker.launchCameraAsync({
+          allowsEditing: true,
+          aspect: [16, 9],
+          quality: 0.8,
+        });
+        if (!result.canceled && result.assets?.[0]?.uri) {
+          await processAndUploadPhoto(result.assets[0].uri);
+        }
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          showError('Photo library permission is required', 'Permission Denied');
+          return;
+        }
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [16, 9],
+          quality: 0.8,
+        });
+        if (!result.canceled && result.assets?.[0]?.uri) {
+          await processAndUploadPhoto(result.assets[0].uri);
+        }
+      }
+    } catch (err: any) {
+      console.error('Pick photo error:', err);
+      showError('Failed to select photo', 'Error');
+    }
+  };
+
+  const processAndUploadPhoto = async (uri: string) => {
+    try {
+      setUploadingPhoto(true);
+      const compressed = await compressBanner(uri);
+      const cloudflareUrl = await uploadImageToCloudflare(compressed);
+
+      if (targetPhotoService) {
+        await apiClient.put(`/services/${targetPhotoService.id}`, {
+          imageUrl: cloudflareUrl,
+        });
+        setServices((prev) =>
+          prev.map((s) => (s.id === targetPhotoService.id ? { ...s, imageUrl: cloudflareUrl } : s))
+        );
+        queryCache.invalidate('/services');
+        queryCache.invalidate('/services/categories');
+        showSuccess(`Photo updated for "${targetPhotoService.title}"!`, 'Photo Updated');
+      } else if (targetPhotoDeal) {
+        await apiClient.put(`/deals/${targetPhotoDeal.id}`, {
+          imageUrl: cloudflareUrl,
+        });
+        setProviderDeals((prev) =>
+          prev.map((d) => (d.id === targetPhotoDeal.id ? { ...d, imageUrl: cloudflareUrl } : d))
+        );
+        queryCache.invalidate('/deals');
+        showSuccess('Deal photo updated!', 'Photo Updated');
+      }
+      setPhotoActionModalOpen(false);
+    } catch (err: any) {
+      console.error('Process and upload photo error:', err);
+      showError(err.response?.data?.error || 'Failed to upload photo', 'Error');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleRemoveTargetPhoto = async () => {
+    try {
+      setUploadingPhoto(true);
+      if (targetPhotoService) {
+        await apiClient.put(`/services/${targetPhotoService.id}`, {
+          imageUrl: '',
+        });
+        setServices((prev) =>
+          prev.map((s) => (s.id === targetPhotoService.id ? { ...s, imageUrl: undefined } : s))
+        );
+        queryCache.invalidate('/services');
+        queryCache.invalidate('/services/categories');
+        showSuccess('Photo reset to default category image', 'Photo Reset');
+      } else if (targetPhotoDeal) {
+        await apiClient.put(`/deals/${targetPhotoDeal.id}`, {
+          imageUrl: '',
+        });
+        setProviderDeals((prev) =>
+          prev.map((d) => (d.id === targetPhotoDeal.id ? { ...d, imageUrl: undefined } : d))
+        );
+        queryCache.invalidate('/deals');
+        showSuccess('Deal photo removed', 'Photo Removed');
+      }
+      setPhotoActionModalOpen(false);
+    } catch (err: any) {
+      console.error('Remove photo error:', err);
+      showError(err.response?.data?.error || 'Failed to remove photo', 'Error');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
 
   // Fetch all services created by this provider with caching
   const fetchServices = async (targetProvider?: string, force = false) => {
@@ -915,6 +1039,27 @@ export default function ManualServiceDashboardScreen() {
                           <Maximize2 size={10} color="#ffffff" />
                           <Text style={{ fontSize: 9, fontWeight: '800', color: '#ffffff' }}>Enlarge</Text>
                         </View>
+                        <TouchableOpacity
+                          activeOpacity={0.85}
+                          onPress={() => handleOpenServicePhotoAction(svc)}
+                          style={{
+                            position: 'absolute',
+                            bottom: 6,
+                            right: 6,
+                            backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                            paddingHorizontal: 8,
+                            paddingVertical: 4,
+                            borderRadius: 12,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 4,
+                            borderWidth: 1,
+                            borderColor: 'rgba(255, 255, 255, 0.25)',
+                          }}
+                        >
+                          <Camera size={11} color="#ffffff" />
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: '#ffffff' }}>Edit Photo</Text>
+                        </TouchableOpacity>
                       </TouchableOpacity>
 
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -938,31 +1083,50 @@ export default function ManualServiceDashboardScreen() {
                           </Text>
                         </View>
 
-                        <TouchableOpacity
-                          activeOpacity={0.7}
-                          disabled={deletingId === svc.id}
-                          onPress={() =>
-                            setDeleteConfirmTarget({
-                              id: svc.id,
-                              title: svc.title,
-                              type: 'service',
-                            })
-                          }
-                          style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: 8,
-                            backgroundColor: '#fee2e2',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                        >
-                          {deletingId === svc.id ? (
-                            <ActivityIndicator size="small" color="#ef4444" />
-                          ) : (
-                            <Trash2 size={14} color="#ef4444" />
-                          )}
-                        </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <TouchableOpacity
+                            activeOpacity={0.7}
+                            onPress={() => handleOpenServicePhotoAction(svc)}
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: 8,
+                              backgroundColor: '#eff6ff',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              borderWidth: 1,
+                              borderColor: '#bfdbfe',
+                            }}
+                          >
+                            <Pencil size={13} color="#2563eb" />
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            activeOpacity={0.7}
+                            disabled={deletingId === svc.id}
+                            onPress={() =>
+                              setDeleteConfirmTarget({
+                                id: svc.id,
+                                title: svc.title,
+                                type: 'service',
+                              })
+                            }
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: 8,
+                              backgroundColor: '#fee2e2',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            {deletingId === svc.id ? (
+                              <ActivityIndicator size="small" color="#ef4444" />
+                            ) : (
+                              <Trash2 size={14} color="#ef4444" />
+                            )}
+                          </TouchableOpacity>
+                        </View>
                       </View>
 
                       <Text style={{ fontSize: 14, fontWeight: '800', color: '#0f172a', marginBottom: 4, lineHeight: 19 }}>
@@ -1175,6 +1339,72 @@ export default function ManualServiceDashboardScreen() {
                       padding: 14,
                     }}
                   >
+                    {/* Optional Deal Image */}
+                    {Boolean(deal.imageUrl) ? (
+                      <View
+                        style={{
+                          width: '100%',
+                          height: 110,
+                          borderRadius: 12,
+                          overflow: 'hidden',
+                          marginBottom: 10,
+                          backgroundColor: '#e2e8f0',
+                          position: 'relative',
+                        }}
+                      >
+                        <LazyImage
+                          source={{ uri: deal.imageUrl! }}
+                          style={{ width: '100%', height: '100%' }}
+                          contentFit="cover"
+                          loaderColor="#2563eb"
+                        />
+                        <TouchableOpacity
+                          activeOpacity={0.85}
+                          onPress={() => handleOpenDealPhotoAction(deal)}
+                          style={{
+                            position: 'absolute',
+                            bottom: 6,
+                            right: 6,
+                            backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                            paddingHorizontal: 8,
+                            paddingVertical: 4,
+                            borderRadius: 12,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 4,
+                            borderWidth: 1,
+                            borderColor: 'rgba(255, 255, 255, 0.25)',
+                          }}
+                        >
+                          <Camera size={11} color="#ffffff" />
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: '#ffffff' }}>Edit Photo</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => handleOpenDealPhotoAction(deal)}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 6,
+                          backgroundColor: '#f8fafc',
+                          paddingVertical: 6,
+                          paddingHorizontal: 10,
+                          borderRadius: 10,
+                          borderWidth: 1,
+                          borderColor: '#e2e8f0',
+                          borderStyle: 'dashed',
+                          marginBottom: 10,
+                        }}
+                      >
+                        <Camera size={12} color="#64748b" />
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748b' }}>
+                          + Add Photo to this Deal
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                         <View
@@ -1202,32 +1432,51 @@ export default function ManualServiceDashboardScreen() {
                         </View>
                       </View>
 
-                      <TouchableOpacity
-                        activeOpacity={0.7}
-                        disabled={deletingId === deal.id}
-                        onPress={() =>
-                          setDeleteConfirmTarget({
-                            id: deal.id,
-                            title: deal.title,
-                            type: 'deal',
-                            discount: deal.discount,
-                          })
-                        }
-                        style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: 8,
-                          backgroundColor: '#fee2e2',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        {deletingId === deal.id ? (
-                          <ActivityIndicator size="small" color="#ef4444" />
-                        ) : (
-                          <Trash2 size={14} color="#ef4444" />
-                        )}
-                      </TouchableOpacity>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          onPress={() => handleOpenDealPhotoAction(deal)}
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 8,
+                            backgroundColor: '#eff6ff',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderWidth: 1,
+                            borderColor: '#bfdbfe',
+                          }}
+                        >
+                          <Pencil size={13} color="#2563eb" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          disabled={deletingId === deal.id}
+                          onPress={() =>
+                            setDeleteConfirmTarget({
+                              id: deal.id,
+                              title: deal.title,
+                              type: 'deal',
+                              discount: deal.discount,
+                            })
+                          }
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 8,
+                            backgroundColor: '#fee2e2',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          {deletingId === deal.id ? (
+                            <ActivityIndicator size="small" color="#ef4444" />
+                          ) : (
+                            <Trash2 size={14} color="#ef4444" />
+                          )}
+                        </TouchableOpacity>
+                      </View>
                     </View>
 
                     <Text style={{ fontSize: 14, fontWeight: '800', color: '#0f172a', marginBottom: 4 }}>
@@ -1869,6 +2118,128 @@ export default function ManualServiceDashboardScreen() {
         price={enlargedImage?.price}
         onClose={() => setEnlargedImage(null)}
       />
+
+      {/* MODAL: PHOTO EDIT ACTIONS */}
+      <Modal visible={photoActionModalOpen} transparent animationType="fade">
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => !uploadingPhoto && setPhotoActionModalOpen(false)}
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: '#ffffff',
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
+              padding: 24,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <View>
+                <Text style={{ fontSize: 17, fontWeight: '900', color: '#0f172a' }}>
+                  {targetPhotoService ? 'Update Service Photo' : 'Update Deal Photo'}
+                </Text>
+                <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                  {targetPhotoService ? targetPhotoService.title : targetPhotoDeal?.title || 'Offer Banner'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                disabled={uploadingPhoto}
+                onPress={() => setPhotoActionModalOpen(false)}
+                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <X size={16} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            {uploadingPhoto ? (
+              <View style={{ paddingVertical: 30, alignItems: 'center', justifyContent: 'center' }}>
+                <ActivityIndicator size="large" color="#16a34a" />
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#0f172a', marginTop: 12 }}>
+                  Uploading & updating photo...
+                </Text>
+              </View>
+            ) : (
+              <View style={{ gap: 10 }}>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => handlePickTargetPhoto('camera')}
+                  style={{
+                    backgroundColor: '#f8fafc',
+                    borderWidth: 1,
+                    borderColor: '#e2e8f0',
+                    borderRadius: 14,
+                    padding: 14,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 12,
+                  }}
+                >
+                  <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center' }}>
+                    <Camera size={20} color="#2563eb" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#0f172a' }}>Take New Photo</Text>
+                    <Text style={{ fontSize: 11, color: '#64748b' }}>Capture job photo, tool setup, or business banner</Text>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => handlePickTargetPhoto('gallery')}
+                  style={{
+                    backgroundColor: '#f8fafc',
+                    borderWidth: 1,
+                    borderColor: '#e2e8f0',
+                    borderRadius: 14,
+                    padding: 14,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 12,
+                  }}
+                >
+                  <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#fef3c7', alignItems: 'center', justifyContent: 'center' }}>
+                    <ImageIcon size={20} color="#d97706" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#0f172a' }}>Choose from Gallery</Text>
+                    <Text style={{ fontSize: 11, color: '#64748b' }}>Select high quality photo from phone gallery</Text>
+                  </View>
+                </TouchableOpacity>
+
+                {Boolean(targetPhotoService?.imageUrl || targetPhotoDeal?.imageUrl) && (
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={handleRemoveTargetPhoto}
+                    style={{
+                      backgroundColor: '#fff1f2',
+                      borderWidth: 1,
+                      borderColor: '#fecdd3',
+                      borderRadius: 14,
+                      padding: 14,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 12,
+                    }}
+                  >
+                    <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#fee2e2', alignItems: 'center', justifyContent: 'center' }}>
+                      <Trash2 size={20} color="#e11d48" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '800', color: '#e11d48' }}>Reset to Default</Text>
+                      <Text style={{ fontSize: 11, color: '#9f1239' }}>Revert back to default trade category image</Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }

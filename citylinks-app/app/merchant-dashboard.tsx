@@ -38,6 +38,8 @@ import {
   Bell,
   Clock,
   ArrowRight,
+  Pencil,
+  Upload,
 } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
@@ -61,7 +63,7 @@ export default function MerchantDashboardScreen() {
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
 
-  // Edit Storefront Modal
+  // Edit Storefront Modal & Image
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editName, setEditName] = useState('');
   const [editCategory, setEditCategory] = useState('');
@@ -71,8 +73,34 @@ export default function MerchantDashboardScreen() {
   const [editAddress, setEditAddress] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editEmail, setEditEmail] = useState('');
+  const [editShopImage, setEditShopImage] = useState<string | null>(null);
   const [fetchingLocation, setFetchingLocation] = useState(false);
   const [savingShop, setSavingShop] = useState(false);
+  const [uploadingShopImage, setUploadingShopImage] = useState(false);
+  const [shopImageActionModalOpen, setShopImageActionModalOpen] = useState(false);
+
+  // Edit Product Modal State
+  const [editProductModalOpen, setEditProductModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<ProductItem | null>(null);
+  const [editProdName, setEditProdName] = useState('');
+  const [editProdPrice, setEditProdPrice] = useState('');
+  const [editProdUnit, setEditProdUnit] = useState('piece');
+  const [editProdStock, setEditProdStock] = useState('100');
+  const [editProdDescription, setEditProdDescription] = useState('');
+  const [editProdImage, setEditProdImage] = useState<string | null>(null);
+  const [pickingEditProdImage, setPickingEditProdImage] = useState(false);
+  const [savingProductEdit, setSavingProductEdit] = useState(false);
+
+  // Edit Deal Modal State
+  const [editDealModalOpen, setEditDealModalOpen] = useState(false);
+  const [editingDeal, setEditingDeal] = useState<DealItem | null>(null);
+  const [editDealTitle, setEditDealTitle] = useState('');
+  const [editDealDiscount, setEditDealDiscount] = useState('20% OFF');
+  const [editDealCategory, setEditDealCategory] = useState('');
+  const [editDealValidUntil, setEditDealValidUntil] = useState('');
+  const [editDealImage, setEditDealImage] = useState<string | null>(null);
+  const [pickingEditDealImage, setPickingEditDealImage] = useState(false);
+  const [savingDealEdit, setSavingDealEdit] = useState(false);
 
   // Add Product Modal
   const [addProductModalOpen, setAddProductModalOpen] = useState(false);
@@ -236,6 +264,7 @@ export default function MerchantDashboardScreen() {
         setEditAddress(cachedShop.address || cachedShop.location || '');
         setEditPhone(cachedShop.phone || '');
         setEditEmail(cachedShop.email || '');
+        setEditShopImage(cachedShop.imageUrl || null);
       }
     }
 
@@ -263,6 +292,7 @@ export default function MerchantDashboardScreen() {
         setEditAddress(s.address || s.location || '');
         setEditPhone(s.phone || '');
         setEditEmail(s.email || '');
+        setEditShopImage(s.imageUrl || null);
         fetchDeals(s.name, force);
       } else if (userData && !shop) {
         // Fallback default storefront based on user profile if initializing
@@ -351,6 +381,81 @@ export default function MerchantDashboardScreen() {
     }
   };
 
+  // Storefront Cover Image Handlers
+  const handlePickShopPhoto = async (source: 'camera' | 'gallery') => {
+    try {
+      if (source === 'camera') {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+          showError('Camera access is required to capture storefront photo.', 'Permission Needed');
+          return;
+        }
+      } else {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+          showError('Gallery access is required to choose storefront photo.', 'Permission Needed');
+          return;
+        }
+      }
+
+      setUploadingShopImage(true);
+      const result = source === 'camera'
+        ? await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [16, 9], quality: 0.75 })
+        : await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [16, 9], quality: 0.75 });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const compressed = await compressBanner(result.assets[0].uri);
+        setEditShopImage(compressed);
+
+        // If action modal was opened, upload directly and update backend
+        if (shopImageActionModalOpen && shop?.id) {
+          const cloudflareUrl = await uploadImageToCloudflare(compressed);
+          await apiClient.put('/shops/my-shop', {
+            id: shop.id,
+            imageUrl: cloudflareUrl,
+          });
+          setShop((prev) => prev ? { ...prev, imageUrl: cloudflareUrl } : null);
+          queryCache.invalidate('merchant-my-shop');
+          queryCache.invalidate('/shops');
+          queryCache.invalidate('/marketplace/popular');
+          showSuccess('Storefront cover photo updated successfully!', 'Cover Photo Updated');
+          setShopImageActionModalOpen(false);
+        } else {
+          showSuccess('Photo selected! Tap "Save Changes" to apply.', 'Photo Ready');
+        }
+      }
+    } catch (err: any) {
+      console.error('Shop image pick error:', err);
+      showError('Failed to update storefront cover photo.', 'Error');
+    } finally {
+      setUploadingShopImage(false);
+    }
+  };
+
+  const handleRemoveShopPhoto = async () => {
+    try {
+      setUploadingShopImage(true);
+      setEditShopImage(null);
+      if (shop?.id) {
+        await apiClient.put('/shops/my-shop', {
+          id: shop.id,
+          imageUrl: '',
+        });
+        setShop((prev) => prev ? { ...prev, imageUrl: null } : null);
+        queryCache.invalidate('merchant-my-shop');
+        queryCache.invalidate('/shops');
+        queryCache.invalidate('/marketplace/popular');
+        showSuccess('Custom cover photo removed. Reverted to category theme.', 'Photo Reset');
+        setShopImageActionModalOpen(false);
+      }
+    } catch (err: any) {
+      console.error('Remove shop photo error:', err);
+      showError('Failed to remove storefront cover photo.', 'Error');
+    } finally {
+      setUploadingShopImage(false);
+    }
+  };
+
   const handleSaveStorefront = async () => {
     if (!editName.trim()) {
       showError('Shop name is required', 'Missing Field');
@@ -368,7 +473,14 @@ export default function MerchantDashboardScreen() {
 
     try {
       setSavingShop(true);
-      const res = await apiClient.put('/shops/my-shop', {
+      let finalImageUrl: string | null = shop?.imageUrl || null;
+      if (editShopImage && (editShopImage.startsWith('file://') || editShopImage.startsWith('content://') || editShopImage.startsWith('ph://'))) {
+        finalImageUrl = await uploadImageToCloudflare(editShopImage);
+      } else if (editShopImage === null) {
+        finalImageUrl = '';
+      }
+
+      await apiClient.put('/shops/my-shop', {
         id: shop?.id,
         name: editName.trim(),
         category: finalCat,
@@ -376,16 +488,209 @@ export default function MerchantDashboardScreen() {
         address: editAddress.trim(),
         phone: editPhone.trim(),
         email: editEmail.trim(),
+        imageUrl: finalImageUrl,
       });
 
       showSuccess('Storefront updated successfully! Category synchronized across all filters.', 'Updated');
       setEditModalOpen(false);
-      await fetchMyShop();
+      await fetchMyShop(true);
     } catch (err: any) {
       console.error('Save shop error:', err);
       showError(err.response?.data?.error || 'Failed to update shop', 'Error');
     } finally {
       setSavingShop(false);
+    }
+  };
+
+  // Product Edit Handlers
+  const handleOpenEditProduct = (item: ProductItem) => {
+    setEditingProduct(item);
+    setEditProdName(item.name);
+    setEditProdPrice(String(item.price));
+    setEditProdUnit(item.unit || 'piece');
+    setEditProdStock(String(item.stock ?? 100));
+    setEditProdDescription(item.description || '');
+    setEditProdImage(item.imageUrl || null);
+    setEditProductModalOpen(true);
+  };
+
+  const handlePickEditProdPhoto = async (source: 'camera' | 'gallery') => {
+    try {
+      if (source === 'camera') {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+          showError('Camera access is required to take product photo.', 'Permission Needed');
+          return;
+        }
+      } else {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+          showError('Gallery access is required to choose product photo.', 'Permission Needed');
+          return;
+        }
+      }
+
+      setPickingEditProdImage(true);
+      const result = source === 'camera'
+        ? await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.75 })
+        : await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.75 });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const compressed = await compressProductImage(result.assets[0].uri);
+        setEditProdImage(compressed);
+        showSuccess('Product photo selected!', 'Success');
+      }
+    } catch (err: any) {
+      console.error('Edit prod image error:', err);
+      showError('Failed to select product image.', 'Error');
+    } finally {
+      setPickingEditProdImage(false);
+    }
+  };
+
+  const handleSaveProductEdit = async () => {
+    if (!editingProduct) return;
+    if (!editProdName.trim()) {
+      showError('Product name is required.', 'Missing Field');
+      return;
+    }
+    const priceNum = parseFloat(editProdPrice);
+    if (isNaN(priceNum) || priceNum < 0) {
+      showError('Please enter a valid price.', 'Invalid Price');
+      return;
+    }
+
+    try {
+      setSavingProductEdit(true);
+      let finalImageUrl = editProdImage;
+      if (editProdImage && (editProdImage.startsWith('file://') || editProdImage.startsWith('content://') || editProdImage.startsWith('ph://'))) {
+        finalImageUrl = await uploadImageToCloudflare(editProdImage);
+      }
+
+      const targetShopId = shop?.id && shop.id !== 'temp-shop' ? shop.id : 'my-shop';
+      const res = await apiClient.put(`/shops/${targetShopId}/products/${editingProduct.id}`, {
+        name: editProdName.trim(),
+        price: priceNum,
+        unit: editProdUnit.trim() || 'piece',
+        stock: parseInt(editProdStock) || 100,
+        description: editProdDescription.trim() || editProdName.trim(),
+        imageUrl: finalImageUrl,
+      });
+
+      const updated = res.data?.product || {
+        ...editingProduct,
+        name: editProdName.trim(),
+        price: priceNum,
+        unit: editProdUnit.trim() || 'piece',
+        stock: parseInt(editProdStock) || 100,
+        description: editProdDescription.trim(),
+        imageUrl: finalImageUrl,
+      };
+
+      setProducts((prev) => prev.map((p) => (p.id === editingProduct.id ? updated : p)));
+      queryCache.invalidate('merchant-my-shop');
+      queryCache.invalidate(`/shops/${targetShopId}`);
+      showSuccess(`"${editProdName}" updated successfully!`, 'Product Saved');
+      setEditProductModalOpen(false);
+      setEditingProduct(null);
+    } catch (err: any) {
+      console.error('Save product edit error:', err);
+      showError(err.response?.data?.error || 'Failed to update product', 'Error');
+    } finally {
+      setSavingProductEdit(false);
+    }
+  };
+
+  // Deal Edit Handlers
+  const handleOpenEditDeal = (deal: DealItem) => {
+    setEditingDeal(deal);
+    setEditDealTitle(deal.title);
+    setEditDealDiscount(deal.discount);
+    setEditDealCategory(deal.category);
+    setEditDealValidUntil(deal.validUntil || 'Valid till Sunday');
+    setEditDealImage(deal.imageUrl || null);
+    setEditDealModalOpen(true);
+  };
+
+  const handlePickEditDealPhoto = async (source: 'camera' | 'gallery') => {
+    try {
+      if (source === 'camera') {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+          showError('Camera access is required for deal photo.', 'Permission Needed');
+          return;
+        }
+      } else {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+          showError('Gallery access is required for deal photo.', 'Permission Needed');
+          return;
+        }
+      }
+
+      setPickingEditDealImage(true);
+      const result = source === 'camera'
+        ? await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [16, 9], quality: 0.7 })
+        : await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [16, 9], quality: 0.7 });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const compressed = await compressBanner(result.assets[0].uri);
+        setEditDealImage(compressed);
+        showSuccess('Deal photo selected!', 'Success');
+      }
+    } catch (err: any) {
+      console.error('Edit deal image error:', err);
+      showError('Failed to select deal image.', 'Error');
+    } finally {
+      setPickingEditDealImage(false);
+    }
+  };
+
+  const handleSaveDealEdit = async () => {
+    if (!editingDeal) return;
+    if (!editDealTitle.trim()) {
+      showError('Deal title is required.', 'Missing Field');
+      return;
+    }
+    if (!editDealDiscount.trim()) {
+      showError('Deal discount is required.', 'Missing Field');
+      return;
+    }
+
+    try {
+      setSavingDealEdit(true);
+      let finalImageUrl = editDealImage;
+      if (editDealImage && (editDealImage.startsWith('file://') || editDealImage.startsWith('content://') || editDealImage.startsWith('ph://'))) {
+        finalImageUrl = await uploadImageToCloudflare(editDealImage);
+      }
+
+      const res = await apiClient.put(`/deals/${editingDeal.id}`, {
+        title: editDealTitle.trim(),
+        discount: editDealDiscount.trim(),
+        category: editDealCategory.trim() || shop?.category || 'Retail',
+        validUntil: editDealValidUntil.trim() || 'Valid till Sunday',
+        imageUrl: finalImageUrl,
+      });
+
+      const updated = res.data?.deal || {
+        ...editingDeal,
+        title: editDealTitle.trim(),
+        discount: editDealDiscount.trim(),
+        category: editDealCategory.trim() || shop?.category || 'Retail',
+        validUntil: editDealValidUntil.trim(),
+        imageUrl: finalImageUrl,
+      };
+
+      setMerchantDeals((prev) => prev.map((d) => (d.id === editingDeal.id ? updated : d)));
+      queryCache.invalidate('/deals');
+      showSuccess(`Deal "${editDealTitle}" updated successfully!`, 'Deal Saved');
+      setEditDealModalOpen(false);
+      setEditingDeal(null);
+    } catch (err: any) {
+      console.error('Save deal edit error:', err);
+      showError(err.response?.data?.error || 'Failed to update deal', 'Error');
+    } finally {
+      setSavingDealEdit(false);
     }
   };
 
@@ -710,13 +1015,14 @@ export default function MerchantDashboardScreen() {
             {/* Storefront Photo */}
             <View
               style={{
-                height: 140,
+                height: 145,
                 borderRadius: 16,
                 overflow: 'hidden',
                 backgroundColor: '#f1f5f9',
                 marginBottom: 14,
                 borderWidth: 1,
                 borderColor: '#e2e8f0',
+                position: 'relative',
               }}
             >
               <Image
@@ -724,6 +1030,41 @@ export default function MerchantDashboardScreen() {
                 style={{ width: '100%', height: '100%' }}
                 resizeMode="cover"
               />
+              <TouchableOpacity
+                activeOpacity={0.85}
+                disabled={uploadingShopImage}
+                onPress={() => setShopImageActionModalOpen(true)}
+                style={{
+                  position: 'absolute',
+                  bottom: 10,
+                  right: 10,
+                  backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  paddingHorizontal: 12,
+                  paddingVertical: 7,
+                  borderRadius: 20,
+                  borderWidth: 1,
+                  borderColor: 'rgba(255, 255, 255, 0.3)',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.25,
+                  shadowRadius: 4,
+                  elevation: 3,
+                }}
+              >
+                {uploadingShopImage ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <>
+                    <Camera size={13} color="#ffffff" />
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#ffffff' }}>
+                      Edit Cover Photo
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
             </View>
 
             {/* Location & Address */}
@@ -997,30 +1338,69 @@ export default function MerchantDashboardScreen() {
                         borderColor: '#e2e8f0',
                       }}
                     >
-                      <LazyImage
-                        source={{ uri: itemImageUri }}
-                        style={{
-                          width: 44,
-                          height: 44,
-                          borderRadius: 10,
-                          backgroundColor: '#e2e8f0',
-                          marginRight: 12,
-                        }}
-                        contentFit="cover"
-                        loaderColor="#2563eb"
-                      />
-                      <View style={{ flex: 1, marginRight: 10 }}>
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={() => handleOpenEditProduct(item)}
+                        style={{ position: 'relative', marginRight: 12 }}
+                      >
+                        <LazyImage
+                          source={{ uri: itemImageUri }}
+                          style={{
+                            width: 46,
+                            height: 46,
+                            borderRadius: 10,
+                            backgroundColor: '#e2e8f0',
+                          }}
+                          contentFit="cover"
+                          loaderColor="#2563eb"
+                        />
+                        <View
+                          style={{
+                            position: 'absolute',
+                            bottom: -2,
+                            right: -2,
+                            backgroundColor: '#0f172a',
+                            borderRadius: 10,
+                            padding: 3,
+                            borderWidth: 1.5,
+                            borderColor: '#ffffff',
+                          }}
+                        >
+                          <Camera size={9} color="#ffffff" />
+                        </View>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => handleOpenEditProduct(item)}
+                        style={{ flex: 1, marginRight: 10 }}
+                      >
                         <Text style={{ fontSize: 14, fontWeight: '800', color: '#0f172a' }}>
                           {item.name}
                         </Text>
                         <Text style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
                           Stock: {item.stock} {item.unit}s
                         </Text>
-                      </View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      </TouchableOpacity>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                         <Text style={{ fontSize: 15, fontWeight: '900', color: '#ea580c' }}>
                           ₹{item.price}
                         </Text>
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          onPress={() => handleOpenEditProduct(item)}
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 8,
+                            backgroundColor: '#eff6ff',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderWidth: 1,
+                            borderColor: '#bfdbfe',
+                          }}
+                        >
+                          <Pencil size={13} color="#2563eb" />
+                        </TouchableOpacity>
                         <TouchableOpacity
                           activeOpacity={0.7}
                           onPress={() => handleDeleteProduct(item.id, item.name)}
@@ -1244,7 +1624,7 @@ export default function MerchantDashboardScreen() {
                       }}
                     >
                       {/* Optional Deal Image */}
-                      {Boolean(deal.imageUrl) && (
+                      {Boolean(deal.imageUrl) ? (
                         <View
                           style={{
                             width: '100%',
@@ -1253,6 +1633,7 @@ export default function MerchantDashboardScreen() {
                             overflow: 'hidden',
                             marginBottom: 10,
                             backgroundColor: '#e2e8f0',
+                            position: 'relative',
                           }}
                         >
                           <LazyImage
@@ -1261,7 +1642,51 @@ export default function MerchantDashboardScreen() {
                             contentFit="cover"
                             loaderColor="#2563eb"
                           />
+                          <TouchableOpacity
+                            activeOpacity={0.85}
+                            onPress={() => handleOpenEditDeal(deal)}
+                            style={{
+                              position: 'absolute',
+                              bottom: 6,
+                              right: 6,
+                              backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 4,
+                              paddingHorizontal: 8,
+                              paddingVertical: 4,
+                              borderRadius: 12,
+                              borderWidth: 1,
+                              borderColor: 'rgba(255, 255, 255, 0.25)',
+                            }}
+                          >
+                            <Camera size={11} color="#ffffff" />
+                            <Text style={{ color: '#ffffff', fontSize: 10, fontWeight: '700' }}>Edit Photo</Text>
+                          </TouchableOpacity>
                         </View>
+                      ) : (
+                        <TouchableOpacity
+                          activeOpacity={0.8}
+                          onPress={() => handleOpenEditDeal(deal)}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 6,
+                            backgroundColor: '#f8fafc',
+                            paddingVertical: 6,
+                            paddingHorizontal: 10,
+                            borderRadius: 10,
+                            borderWidth: 1,
+                            borderColor: '#e2e8f0',
+                            borderStyle: 'dashed',
+                            marginBottom: 10,
+                          }}
+                        >
+                          <Camera size={12} color="#64748b" />
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748b' }}>
+                            + Add Image to this Offer
+                          </Text>
+                        </TouchableOpacity>
                       )}
 
                       <View
@@ -1305,25 +1730,44 @@ export default function MerchantDashboardScreen() {
                           </View>
                         </View>
 
-                        <TouchableOpacity
-                          activeOpacity={0.7}
-                          disabled={deletingDealId === deal.id}
-                          onPress={() => handleDeleteDeal(deal.id, deal.title, deal.discount)}
-                          style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: 8,
-                            backgroundColor: '#fee2e2',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                        >
-                          {deletingDealId === deal.id ? (
-                            <ActivityIndicator size="small" color="#ef4444" />
-                          ) : (
-                            <Trash2 size={14} color="#ef4444" />
-                          )}
-                        </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <TouchableOpacity
+                            activeOpacity={0.7}
+                            onPress={() => handleOpenEditDeal(deal)}
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: 8,
+                              backgroundColor: '#eff6ff',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              borderWidth: 1,
+                              borderColor: '#bfdbfe',
+                            }}
+                          >
+                            <Pencil size={13} color="#2563eb" />
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            activeOpacity={0.7}
+                            disabled={deletingDealId === deal.id}
+                            onPress={() => handleDeleteDeal(deal.id, deal.title, deal.discount)}
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: 8,
+                              backgroundColor: '#fee2e2',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            {deletingDealId === deal.id ? (
+                              <ActivityIndicator size="small" color="#ef4444" />
+                            ) : (
+                              <Trash2 size={14} color="#ef4444" />
+                            )}
+                          </TouchableOpacity>
+                        </View>
                       </View>
 
                       <Text
@@ -1416,6 +1860,92 @@ export default function MerchantDashboardScreen() {
               </View>
 
               <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+                {/* Storefront Cover Photo */}
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#0f172a', marginBottom: 6 }}>
+                    Storefront Cover Photo
+                  </Text>
+                  <View
+                    style={{
+                      height: 125,
+                      borderRadius: 14,
+                      overflow: 'hidden',
+                      backgroundColor: '#f1f5f9',
+                      borderWidth: 1,
+                      borderColor: '#cbd5e1',
+                      position: 'relative',
+                    }}
+                  >
+                    <Image
+                      source={{ uri: editShopImage || getShopCoverImage(shop) }}
+                      style={{ width: '100%', height: '100%' }}
+                      resizeMode="cover"
+                    />
+                    <View
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        backgroundColor: 'rgba(0,0,0,0.35)',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 10,
+                      }}
+                    >
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={() => handlePickShopPhoto('camera')}
+                        style={{
+                          backgroundColor: '#ffffff',
+                          paddingHorizontal: 12,
+                          paddingVertical: 7,
+                          borderRadius: 20,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 5,
+                        }}
+                      >
+                        <Camera size={13} color="#0f172a" />
+                        <Text style={{ fontSize: 11, fontWeight: '800', color: '#0f172a' }}>Camera</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={() => handlePickShopPhoto('gallery')}
+                        style={{
+                          backgroundColor: '#ffffff',
+                          paddingHorizontal: 12,
+                          paddingVertical: 7,
+                          borderRadius: 20,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 5,
+                        }}
+                      >
+                        <ImageIcon size={13} color="#0f172a" />
+                        <Text style={{ fontSize: 11, fontWeight: '800', color: '#0f172a' }}>Gallery</Text>
+                      </TouchableOpacity>
+                      {editShopImage && (
+                        <TouchableOpacity
+                          activeOpacity={0.85}
+                          onPress={handleRemoveShopPhoto}
+                          style={{
+                            backgroundColor: '#fee2e2',
+                            paddingHorizontal: 10,
+                            paddingVertical: 7,
+                            borderRadius: 20,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 4,
+                          }}
+                        >
+                          <Trash2 size={12} color="#dc2626" />
+                          <Text style={{ fontSize: 11, fontWeight: '800', color: '#dc2626' }}>Reset</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+                </View>
+
                 {/* 1. Shop Name */}
                 <View style={{ marginBottom: 14 }}>
                   <Text style={{ fontSize: 12, fontWeight: '800', color: '#0f172a', marginBottom: 6 }}>
@@ -2326,6 +2856,570 @@ export default function MerchantDashboardScreen() {
             </View>
           </View>
         </View>
+      </Modal>
+
+      {/* MODAL: STOREFRONT COVER PHOTO ACTIONS */}
+      <Modal visible={shopImageActionModalOpen} transparent animationType="fade">
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => setShopImageActionModalOpen(false)}
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: '#ffffff',
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
+              padding: 24,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <View>
+                <Text style={{ fontSize: 17, fontWeight: '900', color: '#0f172a' }}>
+                  Update Storefront Photo
+                </Text>
+                <Text style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                  Visible on your shop header and Near By directory
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShopImageActionModalOpen(false)}
+                style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <X size={16} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ gap: 10 }}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => handlePickShopPhoto('camera')}
+                style={{
+                  backgroundColor: '#f8fafc',
+                  borderWidth: 1,
+                  borderColor: '#e2e8f0',
+                  borderRadius: 14,
+                  padding: 14,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 12,
+                }}
+              >
+                <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#eff6ff', alignItems: 'center', justifyContent: 'center' }}>
+                  <Camera size={20} color="#2563eb" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#0f172a' }}>Take New Photo</Text>
+                  <Text style={{ fontSize: 11, color: '#64748b' }}>Use camera to capture store entrance or sign</Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => handlePickShopPhoto('gallery')}
+                style={{
+                  backgroundColor: '#f8fafc',
+                  borderWidth: 1,
+                  borderColor: '#e2e8f0',
+                  borderRadius: 14,
+                  padding: 14,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 12,
+                }}
+              >
+                <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#fef3c7', alignItems: 'center', justifyContent: 'center' }}>
+                  <ImageIcon size={20} color="#d97706" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#0f172a' }}>Choose from Gallery</Text>
+                  <Text style={{ fontSize: 11, color: '#64748b' }}>Select existing photo from your phone</Text>
+                </View>
+              </TouchableOpacity>
+
+              {Boolean(shop?.imageUrl) && (
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={handleRemoveShopPhoto}
+                  style={{
+                    backgroundColor: '#fff1f2',
+                    borderWidth: 1,
+                    borderColor: '#fecdd3',
+                    borderRadius: 14,
+                    padding: 14,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 12,
+                  }}
+                >
+                  <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: '#fee2e2', alignItems: 'center', justifyContent: 'center' }}>
+                    <Trash2 size={20} color="#e11d48" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#e11d48' }}>Remove Custom Photo</Text>
+                    <Text style={{ fontSize: 11, color: '#9f1239' }}>Reset to category default cover image</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* MODAL: EDIT PRODUCT */}
+      <Modal visible={editProductModalOpen} transparent animationType="fade">
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.65)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+            <View style={{ backgroundColor: '#ffffff', borderRadius: 24, padding: 20, width: '100%', maxWidth: 420, maxHeight: '88%' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <Text style={{ fontSize: 17, fontWeight: '900', color: '#0f172a' }}>
+                  Edit Product & Photo
+                </Text>
+                <TouchableOpacity onPress={() => setEditProductModalOpen(false)}>
+                  <X size={20} color="#64748b" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 10 }}>
+                {/* Product Photo Picker */}
+                <View style={{ marginBottom: 14 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#0f172a', marginBottom: 6 }}>
+                    Product Image
+                  </Text>
+                  <View
+                    style={{
+                      height: 120,
+                      borderRadius: 14,
+                      overflow: 'hidden',
+                      backgroundColor: '#f1f5f9',
+                      borderWidth: 1,
+                      borderColor: '#cbd5e1',
+                      position: 'relative',
+                    }}
+                  >
+                    <Image
+                      source={{ uri: editProdImage || getProductCoverImage(editingProduct || {}, shop?.category) }}
+                      style={{ width: '100%', height: '100%' }}
+                      resizeMode="cover"
+                    />
+                    <View
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        backgroundColor: 'rgba(0,0,0,0.35)',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 10,
+                      }}
+                    >
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        disabled={pickingEditProdImage}
+                        onPress={() => handlePickEditProdPhoto('camera')}
+                        style={{
+                          backgroundColor: '#ffffff',
+                          paddingHorizontal: 12,
+                          paddingVertical: 7,
+                          borderRadius: 20,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 5,
+                        }}
+                      >
+                        <Camera size={13} color="#0f172a" />
+                        <Text style={{ fontSize: 11, fontWeight: '800', color: '#0f172a' }}>Camera</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        disabled={pickingEditProdImage}
+                        onPress={() => handlePickEditProdPhoto('gallery')}
+                        style={{
+                          backgroundColor: '#ffffff',
+                          paddingHorizontal: 12,
+                          paddingVertical: 7,
+                          borderRadius: 20,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 5,
+                        }}
+                      >
+                        <ImageIcon size={13} color="#0f172a" />
+                        <Text style={{ fontSize: 11, fontWeight: '800', color: '#0f172a' }}>Gallery</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Name */}
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#0f172a', marginBottom: 6 }}>
+                    Product Name *
+                  </Text>
+                  <TextInput
+                    value={editProdName}
+                    onChangeText={setEditProdName}
+                    placeholder="e.g. Sona Masoori Rice (25kg)"
+                    placeholderTextColor="#94a3b8"
+                    style={{
+                      backgroundColor: '#f8fafc',
+                      borderWidth: 1,
+                      borderColor: '#cbd5e1',
+                      borderRadius: 12,
+                      padding: 10,
+                      fontSize: 14,
+                      color: '#0f172a',
+                    }}
+                  />
+                </View>
+
+                {/* Price & Unit */}
+                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#0f172a', marginBottom: 6 }}>
+                      Price (₹) *
+                    </Text>
+                    <TextInput
+                      value={editProdPrice}
+                      onChangeText={setEditProdPrice}
+                      keyboardType="numeric"
+                      placeholder="e.g. 1350"
+                      placeholderTextColor="#94a3b8"
+                      style={{
+                        backgroundColor: '#f8fafc',
+                        borderWidth: 1,
+                        borderColor: '#cbd5e1',
+                        borderRadius: 12,
+                        padding: 10,
+                        fontSize: 14,
+                        color: '#0f172a',
+                      }}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#0f172a', marginBottom: 6 }}>
+                      Unit (kg/pc)
+                    </Text>
+                    <TextInput
+                      value={editProdUnit}
+                      onChangeText={setEditProdUnit}
+                      placeholder="e.g. bag, kg, pc"
+                      placeholderTextColor="#94a3b8"
+                      style={{
+                        backgroundColor: '#f8fafc',
+                        borderWidth: 1,
+                        borderColor: '#cbd5e1',
+                        borderRadius: 12,
+                        padding: 10,
+                        fontSize: 14,
+                        color: '#0f172a',
+                      }}
+                    />
+                  </View>
+                </View>
+
+                {/* Stock */}
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#0f172a', marginBottom: 6 }}>
+                    Stock Quantity
+                  </Text>
+                  <TextInput
+                    value={editProdStock}
+                    onChangeText={setEditProdStock}
+                    keyboardType="numeric"
+                    placeholder="e.g. 50"
+                    placeholderTextColor="#94a3b8"
+                    style={{
+                      backgroundColor: '#f8fafc',
+                      borderWidth: 1,
+                      borderColor: '#cbd5e1',
+                      borderRadius: 12,
+                      padding: 10,
+                      fontSize: 14,
+                      color: '#0f172a',
+                    }}
+                  />
+                </View>
+
+                {/* Description */}
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#0f172a', marginBottom: 6 }}>
+                    Description (Optional)
+                  </Text>
+                  <TextInput
+                    value={editProdDescription}
+                    onChangeText={setEditProdDescription}
+                    placeholder="Product details, brand, purity, etc."
+                    placeholderTextColor="#94a3b8"
+                    multiline
+                    style={{
+                      backgroundColor: '#f8fafc',
+                      borderWidth: 1,
+                      borderColor: '#cbd5e1',
+                      borderRadius: 12,
+                      padding: 10,
+                      fontSize: 13,
+                      color: '#0f172a',
+                      minHeight: 50,
+                    }}
+                  />
+                </View>
+
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  disabled={savingProductEdit}
+                  onPress={handleSaveProductEdit}
+                  style={{
+                    backgroundColor: '#2563eb',
+                    paddingVertical: 13,
+                    borderRadius: 14,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {savingProductEdit ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#ffffff' }}>
+                      Save Product Changes
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* MODAL: EDIT DEAL */}
+      <Modal visible={editDealModalOpen} transparent animationType="slide">
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.65)', justifyContent: 'flex-end' }}>
+            <View
+              style={{
+                backgroundColor: '#ffffff',
+                borderTopLeftRadius: 30,
+                borderTopRightRadius: 30,
+                padding: 20,
+                maxHeight: '90%',
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <View>
+                  <Text style={{ fontSize: 18, fontWeight: '900', color: '#0f172a' }}>
+                    Edit Deal & Offer Photo
+                  </Text>
+                  <Text style={{ fontSize: 11, fontWeight: '500', color: '#64748b' }}>
+                    Update offer banner, discount, and details
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setEditDealModalOpen(false)}
+                  style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <X size={18} color="#64748b" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
+                {/* Deal Image Picker */}
+                <View style={{ marginBottom: 14 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#0f172a', marginBottom: 6 }}>
+                    Deal Banner Photo
+                  </Text>
+                  <View
+                    style={{
+                      height: 125,
+                      borderRadius: 14,
+                      overflow: 'hidden',
+                      backgroundColor: '#f1f5f9',
+                      borderWidth: 1,
+                      borderColor: '#cbd5e1',
+                      position: 'relative',
+                    }}
+                  >
+                    {editDealImage ? (
+                      <Image
+                        source={{ uri: editDealImage }}
+                        style={{ width: '100%', height: '100%' }}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fef3c7' }}>
+                        <Tag size={28} color="#d97706" />
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#92400e', marginTop: 4 }}>
+                          No image selected
+                        </Text>
+                      </View>
+                    )}
+                    <View
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        backgroundColor: 'rgba(0,0,0,0.35)',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 10,
+                      }}
+                    >
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        disabled={pickingEditDealImage}
+                        onPress={() => handlePickEditDealPhoto('camera')}
+                        style={{
+                          backgroundColor: '#ffffff',
+                          paddingHorizontal: 12,
+                          paddingVertical: 7,
+                          borderRadius: 20,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 5,
+                        }}
+                      >
+                        <Camera size={13} color="#0f172a" />
+                        <Text style={{ fontSize: 11, fontWeight: '800', color: '#0f172a' }}>Camera</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        disabled={pickingEditDealImage}
+                        onPress={() => handlePickEditDealPhoto('gallery')}
+                        style={{
+                          backgroundColor: '#ffffff',
+                          paddingHorizontal: 12,
+                          paddingVertical: 7,
+                          borderRadius: 20,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 5,
+                        }}
+                      >
+                        <ImageIcon size={13} color="#0f172a" />
+                        <Text style={{ fontSize: 11, fontWeight: '800', color: '#0f172a' }}>Gallery</Text>
+                      </TouchableOpacity>
+                      {editDealImage && (
+                        <TouchableOpacity
+                          activeOpacity={0.85}
+                          disabled={pickingEditDealImage}
+                          onPress={() => setEditDealImage(null)}
+                          style={{
+                            backgroundColor: '#fee2e2',
+                            paddingHorizontal: 10,
+                            paddingVertical: 7,
+                            borderRadius: 20,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 4,
+                          }}
+                        >
+                          <Trash2 size={12} color="#dc2626" />
+                          <Text style={{ fontSize: 11, fontWeight: '800', color: '#dc2626' }}>Remove</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+                </View>
+
+                {/* Offer Headline */}
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#0f172a', marginBottom: 6 }}>
+                    Deal Title *
+                  </Text>
+                  <TextInput
+                    value={editDealTitle}
+                    onChangeText={setEditDealTitle}
+                    placeholder="e.g. Flat 30% OFF on all Grocery"
+                    placeholderTextColor="#94a3b8"
+                    style={{
+                      backgroundColor: '#f8fafc',
+                      borderWidth: 1,
+                      borderColor: '#cbd5e1',
+                      borderRadius: 12,
+                      padding: 10,
+                      fontSize: 14,
+                      color: '#0f172a',
+                    }}
+                  />
+                </View>
+
+                {/* Discount Badge */}
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#0f172a', marginBottom: 6 }}>
+                    Discount Badge Tag *
+                  </Text>
+                  <TextInput
+                    value={editDealDiscount}
+                    onChangeText={setEditDealDiscount}
+                    placeholder="e.g. 20% OFF, BUY 1 GET 1"
+                    placeholderTextColor="#94a3b8"
+                    style={{
+                      backgroundColor: '#f8fafc',
+                      borderWidth: 1,
+                      borderColor: '#cbd5e1',
+                      borderRadius: 12,
+                      padding: 10,
+                      fontSize: 14,
+                      color: '#0f172a',
+                    }}
+                  />
+                </View>
+
+                {/* Validity */}
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#0f172a', marginBottom: 6 }}>
+                    Valid Till
+                  </Text>
+                  <TextInput
+                    value={editDealValidUntil}
+                    onChangeText={setEditDealValidUntil}
+                    placeholder="e.g. Valid till Sunday, Limited stock"
+                    placeholderTextColor="#94a3b8"
+                    style={{
+                      backgroundColor: '#f8fafc',
+                      borderWidth: 1,
+                      borderColor: '#cbd5e1',
+                      borderRadius: 12,
+                      padding: 10,
+                      fontSize: 14,
+                      color: '#0f172a',
+                    }}
+                  />
+                </View>
+
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  disabled={savingDealEdit}
+                  onPress={handleSaveDealEdit}
+                  style={{
+                    backgroundColor: '#d97706',
+                    paddingVertical: 14,
+                    borderRadius: 16,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {savingDealEdit ? (
+                    <ActivityIndicator size="small" color="#ffffff" />
+                  ) : (
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#ffffff' }}>
+                      Save Deal Changes
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

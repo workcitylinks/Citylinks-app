@@ -279,7 +279,7 @@ router.put('/my-shop', async (req, res) => {
         ...(address ? { address: address.trim() } : {}),
         ...(phone ? { phone: phone.trim() } : {}),
         ...(email ? { email: email.trim() } : {}),
-        ...(imageUrl ? { imageUrl: imageUrl.trim() } : {}),
+        ...(imageUrl !== undefined ? { imageUrl: imageUrl && imageUrl.trim().length > 0 ? imageUrl.trim() : null } : {}),
         ...(latitude !== undefined && latitude !== null ? { latitude: Number(latitude) } : {}),
         ...(longitude !== undefined && longitude !== null ? { longitude: Number(longitude) } : {}),
       },
@@ -427,6 +427,44 @@ router.post('/:id/products', async (req, res) => {
   } catch (err: any) {
     console.error('Error adding product:', err);
     res.status(500).json({ error: err.message || 'Failed to add product' });
+  }
+});
+
+// PUT /api/shops/:id/products/:productId - Update product details and/or photo
+router.put('/:id/products/:productId', async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { name, price, unit, stock, description, imageUrl, isActive } = req.body;
+
+    const existingProduct = await prisma.product.findUnique({
+      where: { id: String(productId) },
+    });
+    if (!existingProduct) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    if (imageUrl !== undefined && imageUrl !== existingProduct.imageUrl) {
+      await handleImageReplacement(existingProduct.imageUrl, imageUrl);
+    }
+
+    const updated = await prisma.product.update({
+      where: { id: String(productId) },
+      data: {
+        ...(name ? { name: name.trim() } : {}),
+        ...(description !== undefined ? { description: description ? description.trim() : null } : {}),
+        ...(price !== undefined ? { price: Number(price) >= 0 ? Number(price) : 0 } : {}),
+        ...(unit ? { unit: unit.trim() } : {}),
+        ...(stock !== undefined ? { stock: Number(stock) } : {}),
+        ...(imageUrl !== undefined ? { imageUrl: imageUrl && imageUrl.trim().length > 0 ? imageUrl.trim() : null } : {}),
+        ...(isActive !== undefined ? { isActive: Boolean(isActive) } : {}),
+      },
+    });
+
+    invalidateCache();
+    res.json({ success: true, product: updated });
+  } catch (err: any) {
+    console.error('Error updating product:', err);
+    res.status(500).json({ error: err.message || 'Failed to update product' });
   }
 });
 

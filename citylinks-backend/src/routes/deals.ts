@@ -2,7 +2,7 @@ import express from 'express';
 import { cacheResponse, invalidateCache } from '../middleware/cache';
 import { prisma } from '../lib/prisma';
 import { createAndSendNotification } from '../services/notificationService';
-import { deleteCloudflareImage } from '../utils/cloudflareImages';
+import { deleteCloudflareImage, handleImageReplacement } from '../utils/cloudflareImages';
 
 const router = express.Router();
 
@@ -269,6 +269,42 @@ router.patch('/:id/toggle', async (req, res) => {
     res.json({ success: true, deal: updated });
   } catch (err: any) {
     console.error('Error toggling deal:', err);
+    res.status(500).json({ error: err.message || 'Failed to update deal' });
+  }
+});
+
+// PUT /api/deals/:id - Update deal details and/or photo
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, discount, category, validUntil, linkUrl, imageUrl, isActive } = req.body;
+
+    const existingDeal = await prisma.deal.findUnique({ where: { id } });
+    if (!existingDeal) {
+      return res.status(404).json({ error: 'Deal not found' });
+    }
+
+    if (imageUrl !== undefined && imageUrl !== existingDeal.imageUrl) {
+      await handleImageReplacement(existingDeal.imageUrl, imageUrl);
+    }
+
+    const updated = await prisma.deal.update({
+      where: { id },
+      data: {
+        ...(title ? { title: title.trim() } : {}),
+        ...(discount ? { discount: discount.trim() } : {}),
+        ...(category ? { category: category.trim() } : {}),
+        ...(validUntil !== undefined ? { validUntil: validUntil ? validUntil.trim() : null } : {}),
+        ...(linkUrl !== undefined ? { linkUrl: linkUrl ? linkUrl.trim() : null } : {}),
+        ...(imageUrl !== undefined ? { imageUrl: imageUrl && imageUrl.trim().length > 0 ? imageUrl.trim() : null } : {}),
+        ...(isActive !== undefined ? { isActive: Boolean(isActive) } : {}),
+      },
+    });
+
+    invalidateCache();
+    res.json({ success: true, deal: updated });
+  } catch (err: any) {
+    console.error('Error updating deal:', err);
     res.status(500).json({ error: err.message || 'Failed to update deal' });
   }
 });

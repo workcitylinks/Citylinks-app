@@ -49,6 +49,7 @@ import {
   Search,
   Filter,
   Calendar,
+  Pencil,
 } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
@@ -1838,13 +1839,22 @@ export default function TransportDashboardScreen() {
                         </Text>
                       </View>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      onPress={() => setPreviewImageUrl(driver.drivingLicensePhoto)}
-                      className="p-2 rounded-lg bg-blue-50 border border-blue-200"
-                    >
-                      <Eye size={14} color="#2563eb" />
-                    </TouchableOpacity>
+                    <View className="flex-row items-center gap-1.5">
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={handleOpenEditProfile}
+                        className="p-2 rounded-lg bg-slate-50 border border-slate-200"
+                      >
+                        <Pencil size={14} color="#475569" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => setPreviewImageUrl(driver.drivingLicensePhoto)}
+                        className="p-2 rounded-lg bg-blue-50 border border-blue-200"
+                      >
+                        <Eye size={14} color="#2563eb" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 ) : (
                   <View className="mt-2 bg-slate-100/70 p-2.5 rounded-xl border border-dashed border-slate-300 flex-row items-center justify-between">
@@ -1894,13 +1904,22 @@ export default function TransportDashboardScreen() {
                         <Text className="text-[10px] text-blue-600 font-semibold mt-0.5">Tap to view full image</Text>
                       </View>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      onPress={() => setPreviewImageUrl(driver.aadhaarPhoto)}
-                      className="p-2 rounded-lg bg-blue-50 border border-blue-200"
-                    >
-                      <Eye size={14} color="#2563eb" />
-                    </TouchableOpacity>
+                    <View className="flex-row items-center gap-1.5">
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={handleOpenEditProfile}
+                        className="p-2 rounded-lg bg-slate-50 border border-slate-200"
+                      >
+                        <Pencil size={14} color="#475569" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => setPreviewImageUrl(driver.aadhaarPhoto)}
+                        className="p-2 rounded-lg bg-blue-50 border border-blue-200"
+                      >
+                        <Eye size={14} color="#2563eb" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 ) : (
                   <View className="mt-2 bg-slate-100/70 p-2.5 rounded-xl border border-dashed border-slate-300 flex-row items-center justify-between">
