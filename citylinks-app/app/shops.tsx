@@ -34,6 +34,7 @@ import { useShops, ShopItem } from '../queries/marketplaceQueries';
 import { useUserLocation } from '../hooks/useUserLocation';
 import {
   computeShopDistance,
+  resolveShopCoordinates,
   FormattedDistance,
   calculateDistanceInMeters,
   DEFAULT_MOBILE_COORDS,
@@ -128,7 +129,12 @@ export default function NearbyShopsScreen() {
   // Compute distance from mobile device for every shop and sort by nearest
   const enrichedShops = useMemo<EnrichedShopItem[]>(() => {
     const list: EnrichedShopItem[] = filteredShops.map((shop) => {
-      const distance = computeShopDistance(mobileCoords, shop.latitude, shop.longitude);
+      const distance = computeShopDistance(
+        mobileCoords,
+        shop.latitude,
+        shop.longitude,
+        shop.address || shop.location
+      );
       return {
         ...shop,
         distance,
@@ -159,21 +165,16 @@ export default function NearbyShopsScreen() {
       router.push('/auth' as any);
       return;
     }
-    const destLat = shop.latitude ?? mobileCoords.latitude;
-    const destLng = shop.longitude ?? mobileCoords.longitude;
-    const label = encodeURIComponent(shop.name);
+    const resolved = resolveShopCoordinates(shop, mobileCoords);
+    const destLat = resolved.latitude;
+    const destLng = resolved.longitude;
 
-    const url = Platform.select({
-      ios: `maps:0,0?q=${label}@${destLat},${destLng}`,
-      android: `geo:0,0?q=${destLat},${destLng}(${label})`,
-      default: `https://www.google.com/maps/dir/?api=1&destination=${destLat},${destLng}`,
+    // Use universal Google Maps Directions URL which reliably opens native Google Maps in turn-by-turn mode
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${destLat},${destLng}`;
+
+    Linking.openURL(url).catch(() => {
+      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${destLat},${destLng}`);
     });
-
-    if (url) {
-      Linking.openURL(url).catch(() => {
-        Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${destLat},${destLng}`);
-      });
-    }
   };
 
   const handleVisitShop = (shop: ShopItem) => {

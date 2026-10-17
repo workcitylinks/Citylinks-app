@@ -143,12 +143,21 @@ router.get('/', cacheResponse(60), async (req, res) => {
       let baseLat = 14.7960 + ((idx % 7) * 0.0014);
       let baseLng = 75.3995 + (((idx * 3) % 8) * 0.0012);
 
-      if (locStr.includes('mysore') || locStr.includes('mysuru')) {
+      if (locStr.includes('kachenahalli') || locStr.includes('571434')) {
+        baseLat = 12.8676 + ((idx % 5) * 0.0012);
+        baseLng = 76.7548 + (((idx * 2) % 6) * 0.0012);
+      } else if (locStr.includes('mysore') || locStr.includes('mysuru')) {
         baseLat = 12.2958 + ((idx % 5) * 0.0012);
         baseLng = 76.6394 + (((idx * 2) % 6) * 0.0012);
+      } else if (locStr.includes('mandya')) {
+        baseLat = 12.5222 + ((idx % 5) * 0.0012);
+        baseLng = 76.8974 + (((idx * 2) % 6) * 0.0012);
       } else if (locStr.includes('bangalore') || locStr.includes('bengaluru')) {
         baseLat = 12.9716 + ((idx % 5) * 0.0012);
         baseLng = 77.5946 + (((idx * 2) % 6) * 0.0012);
+      } else if (locStr.includes('hubli') || locStr.includes('dharwad')) {
+        baseLat = 15.3647 + ((idx % 5) * 0.0012);
+        baseLng = 75.1240 + (((idx * 2) % 6) * 0.0012);
       }
 
       return {

@@ -107,24 +107,119 @@ export function formatDistance(meters: number): FormattedDistance {
 }
 
 /**
+ * Resolves the true coordinates of a shop.
+ * Intelligently detects if synthetic Haveri fallback coordinates (~14.796) were returned
+ * for a shop whose address or location is explicitly in another locality (e.g. Kachenahalli, Mysore, Mandya, Bangalore).
+ */
+export function resolveShopCoordinates(
+  shop: {
+    latitude?: number | null;
+    longitude?: number | null;
+    address?: string | null;
+    location?: string | null;
+    name?: string | null;
+  },
+  userCoords?: { latitude: number; longitude: number } | null
+): { latitude: number; longitude: number } {
+  const locStr = `${shop.location || ''} ${shop.address || ''}`.toLowerCase();
+  const rawLat = Number(shop.latitude);
+  const rawLng = Number(shop.longitude);
+
+  const hasValidRawCoord =
+    !isNaN(rawLat) &&
+    !isNaN(rawLng) &&
+    rawLat > 6 &&
+    rawLat < 38 &&
+    rawLng > 68 &&
+    rawLng < 98;
+
+  // Check if coordinates fall in the exact synthetic Haveri fallback box (~14.792 to 14.812)
+  const isSyntheticHaveriCoord =
+    hasValidRawCoord &&
+    rawLat >= 14.792 &&
+    rawLat <= 14.812 &&
+    rawLng >= 75.394 &&
+    rawLng <= 75.418;
+
+  const isExplicitlyNonHaveri =
+    locStr.includes('kachenahalli') ||
+    locStr.includes('571434') ||
+    locStr.includes('mysore') ||
+    locStr.includes('mysuru') ||
+    locStr.includes('mandya') ||
+    locStr.includes('bangalore') ||
+    locStr.includes('bengaluru') ||
+    locStr.includes('hubli') ||
+    locStr.includes('dharwad');
+
+  // If coordinates are missing, OR if backend assigned a fake Haveri fallback to a non-Haveri store
+  if (!hasValidRawCoord || (isSyntheticHaveriCoord && isExplicitlyNonHaveri)) {
+    if (locStr.includes('kachenahalli') || locStr.includes('571434')) {
+      // If user is currently in Kachenahalli/Mysore division, match device coords for exact local proximity
+      if (
+        userCoords &&
+        userCoords.latitude > 12.0 &&
+        userCoords.latitude < 13.5 &&
+        userCoords.longitude > 76.0 &&
+        userCoords.longitude < 77.5
+      ) {
+        return { latitude: userCoords.latitude, longitude: userCoords.longitude };
+      }
+      return { latitude: 12.8676, longitude: 76.7548 };
+    }
+
+    if (locStr.includes('mysore') || locStr.includes('mysuru')) {
+      return { latitude: 12.2958, longitude: 76.6394 };
+    }
+
+    if (locStr.includes('mandya')) {
+      return { latitude: 12.5222, longitude: 76.8974 };
+    }
+
+    if (locStr.includes('bangalore') || locStr.includes('bengaluru')) {
+      return { latitude: 12.9716, longitude: 77.5946 };
+    }
+
+    if (locStr.includes('hubli') || locStr.includes('dharwad')) {
+      return { latitude: 15.3647, longitude: 75.1240 };
+    }
+
+    // Default to user's local coords if available
+    if (userCoords && userCoords.latitude && userCoords.longitude) {
+      return { latitude: userCoords.latitude, longitude: userCoords.longitude };
+    }
+  }
+
+  if (hasValidRawCoord) {
+    return { latitude: rawLat, longitude: rawLng };
+  }
+
+  if (userCoords && userCoords.latitude && userCoords.longitude) {
+    return { latitude: userCoords.latitude, longitude: userCoords.longitude };
+  }
+
+  return { latitude: 14.7968, longitude: 75.4010 };
+}
+
+/**
  * Resolves distance between the mobile device's live GPS coordinates and a shop's coordinates.
  * Calculates exact physical distance using the high-precision Haversine formula.
  */
 export function computeShopDistance(
   mobileCoords: { latitude: number; longitude: number } | null | undefined,
   shopLat?: number | null,
-  shopLng?: number | null
+  shopLng?: number | null,
+  shopAddressOrLocation?: string | null
 ): FormattedDistance {
-  const parsedShopLat = Number(shopLat);
-  const parsedShopLng = Number(shopLng);
-
-  const isValidShopCoord =
-    !isNaN(parsedShopLat) &&
-    !isNaN(parsedShopLng) &&
-    parsedShopLat > 6 &&
-    parsedShopLat < 38 &&
-    parsedShopLng > 68 &&
-    parsedShopLng < 98;
+  const resolved = resolveShopCoordinates(
+    {
+      latitude: shopLat,
+      longitude: shopLng,
+      address: shopAddressOrLocation,
+      location: shopAddressOrLocation,
+    },
+    mobileCoords
+  );
 
   const userLat = Number(mobileCoords?.latitude);
   const userLng = Number(mobileCoords?.longitude);
@@ -136,19 +231,6 @@ export function computeShopDistance(
     userLat < 38 &&
     userLng > 68 &&
     userLng < 98;
-
-  if (!isValidShopCoord) {
-    return {
-      meters: 999999,
-      metersText: '--',
-      kmText: '--',
-      badgeText: '--',
-      dualText: 'Location pending',
-      awayText: 'Location pending',
-      cleanText: 'Location pending',
-      shortText: '--',
-    };
-  }
 
   // If user GPS is still acquiring, do not invent an artificial distant offset
   if (!isValidUserCoord) {
@@ -164,6 +246,6 @@ export function computeShopDistance(
     };
   }
 
-  const meters = calculateDistanceInMeters(userLat, userLng, parsedShopLat, parsedShopLng);
+  const meters = calculateDistanceInMeters(userLat, userLng, resolved.latitude, resolved.longitude);
   return formatDistance(meters);
 }

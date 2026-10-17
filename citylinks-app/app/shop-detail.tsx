@@ -35,7 +35,7 @@ import { apiClient } from '../api/apiClient';
 import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
 import { useShopDetail, ProductItem } from '../queries/marketplaceQueries';
 import { useUserLocation } from '../hooks/useUserLocation';
-import { computeShopDistance } from '../utils/distance';
+import { computeShopDistance, resolveShopCoordinates } from '../utils/distance';
 import { LazyImage } from '../components/ui/LazyImage';
 
 export const getShopCoverImage = (shopItem?: { imageUrl?: string | null; category?: string | null; name?: string } | null) => {
@@ -116,8 +116,13 @@ export default function ShopDetailScreen() {
   // Mobile Device Location & Distance
   const { coords: mobileCoords } = useUserLocation();
   const distance = useMemo(() => {
-    return computeShopDistance(mobileCoords, shop?.latitude, shop?.longitude);
-  }, [mobileCoords, shop?.latitude, shop?.longitude]);
+    return computeShopDistance(
+      mobileCoords,
+      shop?.latitude,
+      shop?.longitude,
+      shop?.address || shop?.location
+    );
+  }, [mobileCoords, shop?.latitude, shop?.longitude, shop?.address, shop?.location]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState<{ [productId: string]: number }>({});
@@ -462,8 +467,9 @@ export default function ShopDetailScreen() {
                         router.push('/auth' as any);
                         return;
                       }
-                      const destLat = shop?.latitude ?? mobileCoords.latitude;
-                      const destLng = shop?.longitude ?? mobileCoords.longitude;
+                      const resolved = resolveShopCoordinates(shop || {}, mobileCoords);
+                      const destLat = resolved.latitude;
+                      const destLng = resolved.longitude;
                       Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${destLat},${destLng}`);
                     }}
                     className="flex-row items-center bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg shadow-2xs"

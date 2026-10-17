@@ -75,6 +75,8 @@ export default function MerchantDashboardScreen() {
   const [editAddress, setEditAddress] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editEmail, setEditEmail] = useState('');
+  const [editLatitude, setEditLatitude] = useState<number | null>(null);
+  const [editLongitude, setEditLongitude] = useState<number | null>(null);
   const [editShopImage, setEditShopImage] = useState<string | null>(null);
   const [fetchingLocation, setFetchingLocation] = useState(false);
   const [savingShop, setSavingShop] = useState(false);
@@ -294,6 +296,8 @@ export default function MerchantDashboardScreen() {
         setEditAddress(s.address || s.location || '');
         setEditPhone(s.phone || '');
         setEditEmail(s.email || '');
+        setEditLatitude(s.latitude || null);
+        setEditLongitude(s.longitude || null);
         setEditShopImage(s.imageUrl || null);
         fetchDeals(s.name, force);
       } else if (userData && !shop) {
@@ -348,6 +352,9 @@ export default function MerchantDashboardScreen() {
       const currentLocation = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
+
+      setEditLatitude(currentLocation.coords.latitude);
+      setEditLongitude(currentLocation.coords.longitude);
 
       const [reverseGeocode] = await Location.reverseGeocodeAsync({
         latitude: currentLocation.coords.latitude,
@@ -491,6 +498,8 @@ export default function MerchantDashboardScreen() {
         phone: editPhone.trim(),
         email: editEmail.trim(),
         imageUrl: finalImageUrl,
+        ...(editLatitude != null ? { latitude: editLatitude } : {}),
+        ...(editLongitude != null ? { longitude: editLongitude } : {}),
       });
 
       showSuccess('Storefront updated successfully! Category synchronized across all filters.', 'Updated');
