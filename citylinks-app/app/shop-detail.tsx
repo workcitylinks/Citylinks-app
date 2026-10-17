@@ -426,9 +426,7 @@ export default function ShopDetailScreen() {
                 <View className="flex-row items-center bg-blue-50 border border-blue-200/70 px-2.5 py-1 rounded-lg">
                   <Navigation size={11} color="#2563eb" />
                   <Text className="text-xs font-bold text-blue-800 ml-1.5">
-                    {distance.meters < 1000
-                      ? `${distance.meters} m (${distance.kmText}) away`
-                      : `${distance.kmText} (${distance.metersText}) away`}
+                    {distance.awayText}
                   </Text>
                 </View>
 

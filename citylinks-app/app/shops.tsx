@@ -9,6 +9,7 @@ import {
   Linking,
   Platform,
   Image,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -24,6 +25,9 @@ import {
   Crosshair,
   ArrowUpDown,
   Compass,
+  Star,
+  Check,
+  Globe,
 } from 'lucide-react-native';
 import { useToast } from '../context/ToastContext';
 import { useApp } from '../context/AppContext';
@@ -31,7 +35,12 @@ import { AppRefreshControl } from '../components/ui/RefreshableScrollView';
 import { LazyImage } from '../components/ui/LazyImage';
 import { useShops, ShopItem } from '../queries/marketplaceQueries';
 import { useUserLocation } from '../hooks/useUserLocation';
-import { computeShopDistance, FormattedDistance } from '../utils/distance';
+import {
+  computeShopDistance,
+  FormattedDistance,
+  calculateDistanceInMeters,
+  DEFAULT_MOBILE_COORDS,
+} from '../utils/distance';
 import { getShopCoverImage } from './shop-detail';
 
 interface EnrichedShopItem extends ShopItem {
@@ -65,7 +74,23 @@ export default function NearbyShopsScreen() {
     loading: loadingLocation,
     locality,
     refreshLocation,
+    mode: locationMode,
+    switchToHaveri,
+    switchToLiveGPS,
   } = useUserLocation();
+
+  const [showLocationModal, setShowLocationModal] = useState(false);
+
+  const distanceFromHaveri = useMemo(() => {
+    return calculateDistanceInMeters(
+      mobileCoords.latitude,
+      mobileCoords.longitude,
+      DEFAULT_MOBILE_COORDS.latitude,
+      DEFAULT_MOBILE_COORDS.longitude
+    );
+  }, [mobileCoords]);
+
+  const isFarFromHaveri = distanceFromHaveri > 50000;
 
   // Sync when route parameters change
   useEffect(() => {
@@ -191,16 +216,13 @@ export default function NearbyShopsScreen() {
             {/* Compact GPS Pill */}
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={() => {
-                refreshLocation();
-                showSuccess('Refreshed GPS location', 'Synced');
-              }}
+              onPress={() => setShowLocationModal(true)}
               disabled={loadingLocation}
               className="flex-row items-center bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-full"
             >
               <View
                 className={`w-2 h-2 rounded-full ${
-                  isLiveGPS ? 'bg-emerald-500' : 'bg-amber-500'
+                  isLiveGPS ? 'bg-emerald-500' : 'bg-blue-500'
                 } mr-1.5`}
               />
               {loadingLocation ? (
@@ -232,6 +254,28 @@ export default function NearbyShopsScreen() {
               </TouchableOpacity>
             )}
           </View>
+
+          {/* Hint bar if user is far from Haveri */}
+          {isFarFromHaveri && locationMode === 'live' && (
+            <View className="mb-2 bg-blue-50/90 border border-blue-200/80 rounded-xl px-3 py-2 flex-row items-center justify-between">
+              <View className="flex-row items-center flex-1 mr-2">
+                <MapPin size={13} color="#2563eb" />
+                <Text className="text-[11px] text-blue-900 ml-1.5 flex-1" numberOfLines={1}>
+                  GPS detected <Text className="font-bold">{locality}</Text> (~{Math.round(distanceFromHaveri / 1000)} km away).
+                </Text>
+              </View>
+              <TouchableOpacity
+                activeOpacity={0.75}
+                onPress={() => {
+                  switchToHaveri();
+                  showSuccess('Switched to Haveri Town Center', 'Local View');
+                }}
+                className="bg-blue-600 px-2.5 py-1 rounded-md"
+              >
+                <Text className="text-[10px] font-bold text-white">Use Haveri</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Category Filter Pills */}
           <ScrollView
@@ -340,52 +384,43 @@ export default function NearbyShopsScreen() {
                   >
                     {/* Top Row: Shop Photo + Info */}
                     <View className="flex-row items-start">
-                      {/* Shop Photo Thumbnail */}
-                      <LazyImage
-                        source={{ uri: shopPhoto }}
-                        style={{ width: 64, height: 64, borderRadius: 12, marginRight: 12 }}
-                        contentFit="cover"
-                        loaderColor="#2563eb"
-                      />
+                      {/* Shop Photo Thumbnail with dedicated right margin */}
+                      <View className="mr-3.5">
+                        <LazyImage
+                          source={{ uri: shopPhoto }}
+                          style={{ width: 68, height: 68, borderRadius: 14 }}
+                          contentFit="cover"
+                          loaderColor="#2563eb"
+                        />
+                      </View>
 
                       {/* Main Details */}
-                      <View className="flex-1 pr-1">
+                      <View className="flex-1 min-w-0 justify-between">
                         <View className="flex-row items-center justify-between">
                           <Text
-                            className="text-base font-bold text-slate-900 flex-1 mr-1.5"
+                            className="text-base font-bold text-slate-900 flex-1 mr-2"
                             numberOfLines={1}
                           >
                             {shop.name}
                           </Text>
-                          <View className="flex-row items-center gap-1">
-                            {shop.isSponsored && (
-                              <View className="bg-amber-50 px-2 py-0.5 rounded-full border border-amber-300">
-                                <Text className="text-[10px] font-bold text-amber-800">
-                                  ⭐ Sponsored
-                                </Text>
-                              </View>
-                            )}
-                            <View className="bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
-                              <Text className="text-[10px] font-bold text-blue-600">
-                                {shop.status || 'Verified'}
-                              </Text>
+                          {shop.isSponsored && (
+                            <View className="bg-amber-50 px-1.5 py-0.5 rounded-full border border-amber-300 flex-row items-center justify-center shadow-2xs">
+                              <Star size={10} color="#d97706" fill="#f59e0b" />
                             </View>
-                          </View>
+                          )}
                         </View>
 
                         {/* Category & Single-line location */}
-                        <Text className="text-xs text-slate-500 mt-0.5" numberOfLines={1}>
+                        <Text className="text-xs text-slate-500 mt-1" numberOfLines={1}>
                           <Text className="font-semibold text-slate-700">{shop.category || 'Retail'}</Text>
                           {shop.location ? ` • ${shop.location}` : ''}
                         </Text>
 
-                        {/* Clean, Compact Distance Chip in meters and kilometers */}
-                        <View className="flex-row items-center mt-1.5 bg-blue-50/80 self-start px-2 py-0.5 rounded-md border border-blue-200/70">
+                        {/* Clean, Compact Distance Chip without redundant meter math */}
+                        <View className="flex-row items-center mt-2 bg-blue-50/80 self-start px-2.5 py-0.5 rounded-md border border-blue-200/70">
                           <Navigation size={10} color="#2563eb" />
                           <Text className="text-[11px] font-bold text-blue-800 ml-1">
-                            {shop.distance.meters < 1000
-                              ? `${shop.distance.meters} m (${shop.distance.kmText}) away`
-                              : `${shop.distance.kmText} (${shop.distance.metersText}) away`}
+                            {shop.distance.awayText}
                           </Text>
                         </View>
                       </View>
@@ -450,6 +485,148 @@ export default function NearbyShopsScreen() {
           </ScrollView>
         )}
       </SafeAreaView>
+
+      {/* Location Reference Selection Modal */}
+      <Modal
+        visible={showLocationModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowLocationModal(false)}
+      >
+        <View className="flex-1 bg-black/50 justify-center items-center px-6">
+          <View className="bg-white rounded-3xl p-5 w-full max-w-sm shadow-xl border border-slate-100">
+            {/* Header */}
+            <View className="flex-row items-center justify-between pb-3 border-b border-slate-100 mb-4">
+              <View className="flex-row items-center">
+                <View className="w-8 h-8 rounded-full bg-blue-50 items-center justify-center mr-2.5">
+                  <Navigation size={16} color="#2563eb" />
+                </View>
+                <View>
+                  <Text className="text-base font-bold text-slate-900">
+                    Location & GPS
+                  </Text>
+                  <Text className="text-[11px] text-slate-500">
+                    Choose distance calculation source
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowLocationModal(false)}
+                className="w-7 h-7 rounded-full bg-slate-100 items-center justify-center"
+              >
+                <X size={15} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Option 1: Live Device GPS */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={async () => {
+                setShowLocationModal(false);
+                await switchToLiveGPS();
+                showSuccess(`Using live GPS (${locality})`, 'Live GPS Active');
+              }}
+              className={`p-3.5 rounded-2xl mb-2.5 border flex-row items-center justify-between ${
+                locationMode === 'live'
+                  ? 'bg-blue-50/70 border-blue-500'
+                  : 'bg-slate-50/80 border-slate-200'
+              }`}
+            >
+              <View className="flex-row items-center flex-1 mr-2">
+                <View className="w-9 h-9 rounded-xl bg-blue-100 items-center justify-center mr-3">
+                  <Crosshair size={18} color="#2563eb" />
+                </View>
+                <View className="flex-1">
+                  <View className="flex-row items-center">
+                    <Text className="text-sm font-bold text-slate-900">
+                      Live Device GPS
+                    </Text>
+                    {isLiveGPS && (
+                      <View className="w-2 h-2 rounded-full bg-emerald-500 ml-2" />
+                    )}
+                  </View>
+                  <Text className="text-[11px] text-slate-500 mt-0.5" numberOfLines={1}>
+                    Detected: <Text className="font-semibold text-slate-700">{locality}</Text>
+                  </Text>
+                </View>
+              </View>
+              {locationMode === 'live' && (
+                <View className="w-6 h-6 rounded-full bg-blue-600 items-center justify-center">
+                  <Check size={14} color="#ffffff" />
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* Option 2: Haveri Town Center (Default for local city viewing) */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => {
+                setShowLocationModal(false);
+                switchToHaveri();
+                showSuccess('Set reference to Haveri Town Center', 'Local View Active');
+              }}
+              className={`p-3.5 rounded-2xl mb-4 border flex-row items-center justify-between ${
+                locationMode === 'haveri'
+                  ? 'bg-blue-50/70 border-blue-500'
+                  : 'bg-slate-50/80 border-slate-200'
+              }`}
+            >
+              <View className="flex-row items-center flex-1 mr-2">
+                <View className="w-9 h-9 rounded-xl bg-emerald-100 items-center justify-center mr-3">
+                  <Store size={18} color="#059669" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-sm font-bold text-slate-900">
+                    Haveri Town (Default)
+                  </Text>
+                  <Text className="text-[11px] text-slate-500 mt-0.5">
+                    Haveri commercial hub (0 - 5 km walking/drive)
+                  </Text>
+                </View>
+              </View>
+              {locationMode === 'haveri' && (
+                <View className="w-6 h-6 rounded-full bg-blue-600 items-center justify-center">
+                  <Check size={14} color="#ffffff" />
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* Quick Actions */}
+            <View className="flex-row gap-2">
+              <TouchableOpacity
+                activeOpacity={0.75}
+                disabled={loadingLocation}
+                onPress={async () => {
+                  await refreshLocation();
+                  showSuccess('Synced live GPS satellite coordinates', 'Refreshed');
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-slate-100 items-center justify-center flex-row gap-1.5"
+              >
+                {loadingLocation ? (
+                  <ActivityIndicator size="small" color="#2563eb" />
+                ) : (
+                  <>
+                    <Crosshair size={13} color="#475569" />
+                    <Text className="text-xs font-semibold text-slate-700">
+                      Refresh GPS
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setShowLocationModal(false)}
+                className="flex-1 py-2.5 rounded-xl bg-blue-600 items-center justify-center"
+              >
+                <Text className="text-xs font-bold text-white">
+                  Done
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

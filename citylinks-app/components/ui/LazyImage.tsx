@@ -125,9 +125,9 @@ export const LazyImage: React.FC<LazyImageProps> = ({
     onError?.(e);
   };
 
-  const flattenedStyle = StyleSheet.flatten(style) || {};
+  const flattenedStyle = (StyleSheet.flatten(style) || {}) as any;
 
-  // Extract layout dimensions to ensure loader container matches size
+  // Extract layout dimensions and margins to ensure wrapper container has correct spacing
   const {
     width,
     height,
@@ -136,6 +136,13 @@ export const LazyImage: React.FC<LazyImageProps> = ({
     borderTopRightRadius,
     borderBottomLeftRadius,
     borderBottomRightRadius,
+    margin,
+    marginRight,
+    marginLeft,
+    marginTop,
+    marginBottom,
+    marginHorizontal,
+    marginVertical,
   } = flattenedStyle;
 
   const radiusStyles = {
@@ -146,6 +153,16 @@ export const LazyImage: React.FC<LazyImageProps> = ({
     borderBottomRightRadius,
   };
 
+  const marginStyles = {
+    margin,
+    marginRight,
+    marginLeft,
+    marginTop,
+    marginBottom,
+    marginHorizontal,
+    marginVertical,
+  };
+
   const renderContent = () => {
     // If no valid source or error occurred, display fallback UI
     if (!resolvedSource || hasError) {
@@ -153,8 +170,9 @@ export const LazyImage: React.FC<LazyImageProps> = ({
         <View
           style={[
             styles.fallbackContainer,
-            flattenedStyle,
+            { width, height },
             radiusStyles,
+            marginStyles,
             containerStyle,
           ]}
         >
@@ -174,12 +192,13 @@ export const LazyImage: React.FC<LazyImageProps> = ({
           styles.wrapper,
           { width, height },
           radiusStyles,
+          marginStyles,
           containerStyle,
         ]}
       >
         <ExpoImage
           source={resolvedSource}
-          style={[flattenedStyle as ImageStyle, radiusStyles]}
+          style={[{ width: '100%', height: '100%' }, radiusStyles]}
           contentFit={resolvedContentFit}
           transition={transition}
           cachePolicy={cachePolicy}

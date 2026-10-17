@@ -4,7 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DEFAULT_MOBILE_COORDS } from '../utils/distance';
 
 const LOCATION_CACHE_KEY = '@citylinks_cached_user_location';
-const LOCATION_CACHE_TTL = 15 * 60 * 1000; // 15 minutes TTL
+const LOCATION_MODE_KEY = '@citylinks_location_mode';
+const LOCATION_CACHE_TTL = 10 * 60 * 1000; // 10 minutes TTL
 
 // Fast in-memory cached location object for immediate synchronous return
 let memoryLocationCache: {
@@ -14,30 +15,66 @@ let memoryLocationCache: {
   timestamp: number;
 } | null = null;
 
+let currentModeCache: 'live' | 'haveri' = 'live';
+
 export interface MobileLocationState {
   coords: { latitude: number; longitude: number };
   isLiveGPS: boolean;
   loading: boolean;
   locality: string;
   error: string | null;
+  mode: 'live' | 'haveri';
   refreshLocation: () => Promise<void>;
+  switchToHaveri: () => void;
+  switchToLiveGPS: () => Promise<void>;
+  toggleMode: () => Promise<void>;
 }
 
 export function useUserLocation(): MobileLocationState {
+  const [mode, setMode] = useState<'live' | 'haveri'>(currentModeCache);
   const [coords, setCoords] = useState<{ latitude: number; longitude: number }>(
-    memoryLocationCache ? memoryLocationCache.coords : DEFAULT_MOBILE_COORDS
+    currentModeCache === 'haveri'
+      ? DEFAULT_MOBILE_COORDS
+      : memoryLocationCache ? memoryLocationCache.coords : DEFAULT_MOBILE_COORDS
   );
   const [isLiveGPS, setIsLiveGPS] = useState<boolean>(
-    memoryLocationCache ? memoryLocationCache.isLiveGPS : false
+    currentModeCache === 'haveri'
+      ? false
+      : memoryLocationCache ? memoryLocationCache.isLiveGPS : false
   );
-  const [loading, setLoading] = useState<boolean>(!memoryLocationCache);
+  const [loading, setLoading] = useState<boolean>(!memoryLocationCache && currentModeCache === 'live');
   const [locality, setLocality] = useState<string>(
-    memoryLocationCache ? memoryLocationCache.locality : 'Haveri'
+    currentModeCache === 'haveri'
+      ? 'Haveri'
+      : memoryLocationCache ? memoryLocationCache.locality : 'Haveri'
   );
   const [error, setError] = useState<string | null>(null);
 
+  // Initialize stored mode on mount
+  useEffect(() => {
+    AsyncStorage.getItem(LOCATION_MODE_KEY).then((savedMode) => {
+      if (savedMode === 'haveri') {
+        currentModeCache = 'haveri';
+        setMode('haveri');
+        setCoords(DEFAULT_MOBILE_COORDS);
+        setLocality('Haveri');
+        setIsLiveGPS(false);
+        setLoading(false);
+      }
+    }).catch(() => {});
+  }, []);
+
   const fetchLocation = useCallback(async (forceRefresh = false) => {
-    // If we already have fresh in-memory cache, skip loading to avoid lag
+    // If user explicitly chose Haveri Center mode, do not poll device GPS
+    if (!forceRefresh && currentModeCache === 'haveri') {
+      setCoords(DEFAULT_MOBILE_COORDS);
+      setLocality('Haveri');
+      setIsLiveGPS(false);
+      setLoading(false);
+      return;
+    }
+
+    // If we have fresh in-memory cache and not forcing refresh, return immediately
     if (
       !forceRefresh &&
       memoryLocationCache &&
@@ -51,30 +88,16 @@ export function useUserLocation(): MobileLocationState {
     }
 
     try {
-      // Warm up from persistent storage immediately if available
-      if (!memoryLocationCache) {
-        try {
-          const stored = await AsyncStorage.getItem(LOCATION_CACHE_KEY);
-          if (stored) {
-            const parsed = JSON.parse(stored);
-            if (parsed && parsed.coords && Date.now() - parsed.timestamp < LOCATION_CACHE_TTL) {
-              memoryLocationCache = parsed;
-              setCoords(parsed.coords);
-              setLocality(parsed.locality);
-              setIsLiveGPS(parsed.isLiveGPS);
-              setLoading(false);
-              return;
-            }
-          }
-        } catch {}
-      }
-
       setLoading(true);
       setError(null);
 
-      // Check / request permission
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
+      // Check / request foreground location permission
+      let perm = await Location.getForegroundPermissionsAsync().catch(() => null);
+      if (!perm || perm.status !== 'granted') {
+        perm = await Location.requestForegroundPermissionsAsync().catch(() => null);
+      }
+
+      if (!perm || perm.status !== 'granted') {
         setIsLiveGPS(false);
         setError('Location permission not granted. Showing Haveri city center.');
         setCoords(DEFAULT_MOBILE_COORDS);
@@ -83,20 +106,28 @@ export function useUserLocation(): MobileLocationState {
         return;
       }
 
-      // Fast lookup: first check last known position for near-instant rendering
+      // Check if hardware location services are enabled on the device
+      const servicesEnabled = await Location.hasServicesEnabledAsync().catch(() => true);
+      if (!servicesEnabled) {
+        setError('Device GPS is turned off. Please turn on Location in settings.');
+      }
+
+      // High-accuracy live position lookup directly from GPS hardware
       let currentPosition: Location.LocationObject | null = null;
       try {
-        currentPosition = await Location.getLastKnownPositionAsync();
-      } catch {}
-
-      // If no last known or expired, do balanced accuracy lookup
-      if (!currentPosition) {
+        currentPosition = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        });
+      } catch (highErr) {
+        // Fall back to balanced accuracy or last known position if satellite lock is unavailable indoors
         try {
           currentPosition = await Location.getCurrentPositionAsync({
             accuracy: Location.Accuracy.Balanced,
           });
-        } catch (locErr) {
-          console.warn('GPS position timeout:', locErr);
+        } catch (balancedErr) {
+          try {
+            currentPosition = await Location.getLastKnownPositionAsync();
+          } catch {}
         }
       }
 
@@ -105,13 +136,15 @@ export function useUserLocation(): MobileLocationState {
         setCoords({ latitude, longitude });
         setIsLiveGPS(true);
 
-        // Reverse geocode to get human-readable locality
+        // Reverse geocode to get clean locality name
         let detectedLocality = 'Haveri';
         try {
           const [geo] = await Location.reverseGeocodeAsync({ latitude, longitude });
           if (geo) {
-            detectedLocality =
-              geo.district || geo.subregion || geo.city || geo.street || 'Nearby';
+            let loc = geo.city || geo.district || geo.subregion || geo.street || 'Nearby';
+            // Strip administrative revenue suffixes like "Division"
+            loc = loc.replace(/\s+division$/i, '').trim();
+            detectedLocality = loc || 'Your Location';
           }
         } catch {
           detectedLocality = 'Your Location';
@@ -143,6 +176,31 @@ export function useUserLocation(): MobileLocationState {
     }
   }, []);
 
+  const switchToHaveri = useCallback(() => {
+    currentModeCache = 'haveri';
+    setMode('haveri');
+    setCoords(DEFAULT_MOBILE_COORDS);
+    setLocality('Haveri');
+    setIsLiveGPS(false);
+    AsyncStorage.setItem(LOCATION_MODE_KEY, 'haveri').catch(() => {});
+  }, []);
+
+  const switchToLiveGPS = useCallback(async () => {
+    currentModeCache = 'live';
+    setMode('live');
+    memoryLocationCache = null;
+    AsyncStorage.setItem(LOCATION_MODE_KEY, 'live').catch(() => {});
+    await fetchLocation(true);
+  }, [fetchLocation]);
+
+  const toggleMode = useCallback(async () => {
+    if (mode === 'live') {
+      switchToHaveri();
+    } else {
+      await switchToLiveGPS();
+    }
+  }, [mode, switchToHaveri, switchToLiveGPS]);
+
   useEffect(() => {
     fetchLocation();
   }, [fetchLocation]);
@@ -153,6 +211,10 @@ export function useUserLocation(): MobileLocationState {
     loading,
     locality,
     error,
+    mode,
     refreshLocation: () => fetchLocation(true),
+    switchToHaveri,
+    switchToLiveGPS,
+    toggleMode,
   };
 }

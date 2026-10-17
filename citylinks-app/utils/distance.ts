@@ -51,38 +51,58 @@ export function calculateDistanceInMeters(
 export interface FormattedDistance {
   meters: number;
   metersText: string;     // e.g. "450 m" or "1,200 m"
-  kmText: string;         // e.g. "0.45 km" or "1.20 km"
-  badgeText: string;      // e.g. "450 m (0.45 km)" or "1.20 km (1,200 m)"
-  dualText: string;       // e.g. "450 m • 0.45 km" or "1.2 km • 1,200 m"
-  awayText: string;       // e.g. "450 m away (0.45 km)" or "1.2 km away (1,200 m)"
+  kmText: string;         // e.g. "0.45 km" or "1.2 km"
+  badgeText: string;      // e.g. "450 m" or "1.2 km"
+  dualText: string;       // e.g. "450 m away" or "1.2 km away"
+  awayText: string;       // e.g. "450 m away" or "1.2 km away"
+  cleanText: string;      // e.g. "450 m away" or "1.2 km away"
+  shortText: string;      // e.g. "450 m" or "1.2 km"
 }
 
 /**
- * Formats a distance in meters into both meters (m) and kilometers (km).
+ * Formats a distance in meters cleanly and intuitively:
+ * - < 50 m: "Nearby (< 50 m)"
+ * - < 1000 m: e.g. "450 m away"
+ * - 1 km to 10 km: e.g. "1.2 km away"
+ * - > 10 km: e.g. "14 km away"
  */
 export function formatDistance(meters: number): FormattedDistance {
   const m = Math.max(0, Math.round(meters));
-  const km = (m / 1000).toFixed(m < 1000 ? 2 : 1);
-  const formattedM = m.toLocaleString();
+  const metersText = `${m.toLocaleString()} m`;
 
-  if (m < 1000) {
-    return {
-      meters: m,
-      metersText: `${formattedM} m`,
-      kmText: `${km} km`,
-      badgeText: `${formattedM} m (${km} km)`,
-      dualText: `${formattedM} m • ${km} km`,
-      awayText: `${formattedM} m away (${km} km)`,
-    };
+  let cleanText = '';
+  let shortText = '';
+  let kmText = '';
+
+  if (m < 50) {
+    cleanText = 'Nearby (< 50 m)';
+    shortText = '< 50 m';
+    kmText = '0.05 km';
+  } else if (m < 1000) {
+    cleanText = `${m} m away`;
+    shortText = `${m} m`;
+    kmText = `${(m / 1000).toFixed(2)} km`;
+  } else if (m < 10000) {
+    const km = (m / 1000).toFixed(1);
+    cleanText = `${km} km away`;
+    shortText = `${km} km`;
+    kmText = `${km} km`;
+  } else {
+    const km = Math.round(m / 1000);
+    cleanText = `${km.toLocaleString()} km away`;
+    shortText = `${km.toLocaleString()} km`;
+    kmText = `${km.toLocaleString()} km`;
   }
 
   return {
     meters: m,
-    metersText: `${formattedM} m`,
-    kmText: `${km} km`,
-    badgeText: `${km} km (${formattedM} m)`,
-    dualText: `${km} km • ${formattedM} m`,
-    awayText: `${km} km away (${formattedM} m)`,
+    metersText,
+    kmText,
+    badgeText: shortText,
+    dualText: cleanText,
+    awayText: cleanText,
+    cleanText,
+    shortText,
   };
 }
 
@@ -95,18 +115,23 @@ export function computeShopDistance(
   shopLat?: number | null,
   shopLng?: number | null
 ): FormattedDistance {
-  const userLat = mobileCoords?.latitude ?? DEFAULT_MOBILE_COORDS.latitude;
-  const userLng = mobileCoords?.longitude ?? DEFAULT_MOBILE_COORDS.longitude;
+  const userLat = Number(mobileCoords?.latitude) || DEFAULT_MOBILE_COORDS.latitude;
+  const userLng = Number(mobileCoords?.longitude) || DEFAULT_MOBILE_COORDS.longitude;
 
-  // If shop coordinates are not defined, provide a realistic nearby offset in Haveri
-  const targetLat =
-    shopLat != null && !isNaN(shopLat)
-      ? shopLat
-      : DEFAULT_MOBILE_COORDS.latitude + 0.0035;
-  const targetLng =
-    shopLng != null && !isNaN(shopLng)
-      ? shopLng
-      : DEFAULT_MOBILE_COORDS.longitude + 0.0025;
+  const parsedShopLat = Number(shopLat);
+  const parsedShopLng = Number(shopLng);
+
+  const isValidCoord =
+    !isNaN(parsedShopLat) &&
+    !isNaN(parsedShopLng) &&
+    parsedShopLat > 8 &&
+    parsedShopLat < 37 &&
+    parsedShopLng > 68 &&
+    parsedShopLng < 97;
+
+  // If shop coordinates are not defined or invalid, provide a realistic nearby offset in Haveri
+  const targetLat = isValidCoord ? parsedShopLat : DEFAULT_MOBILE_COORDS.latitude + 0.0035;
+  const targetLng = isValidCoord ? parsedShopLng : DEFAULT_MOBILE_COORDS.longitude + 0.0025;
 
   const meters = calculateDistanceInMeters(userLat, userLng, targetLat, targetLng);
   return formatDistance(meters);

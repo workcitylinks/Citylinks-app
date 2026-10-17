@@ -46,6 +46,7 @@ import {
   Maximize2,
   Trash2,
   AlertTriangle,
+  Star,
 } from "lucide-react-native";
 import { router, useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -1825,8 +1826,8 @@ export default function Index() {
                                   </Text>
                                   <View className="flex-row items-center gap-1.5 flex-shrink-0">
                                     {isSponsored ? (
-                                      <View className="bg-amber-50 px-2 py-0.5 rounded-full border border-amber-300">
-                                        <Text className="text-[10px] font-bold text-amber-800">⭐ Sponsored</Text>
+                                      <View className="bg-amber-50 px-1.5 py-0.5 rounded-full border border-amber-300 flex-row items-center justify-center shadow-2xs">
+                                        <Star size={10} color="#d97706" fill="#f59e0b" />
                                       </View>
                                     ) : null}
                                     <View className="bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
@@ -1847,9 +1848,7 @@ export default function Index() {
                                 <View className="flex-row items-center mt-1.5 bg-blue-50/80 self-start px-2 py-0.5 rounded-md border border-blue-200/70">
                                   <Navigation size={10} color="#2563eb" />
                                   <Text className="text-[11px] font-bold text-blue-800 ml-1">
-                                    {shopDistance.meters < 1000
-                                      ? `${shopDistance.meters} m (${shopDistance.kmText}) away`
-                                      : `${shopDistance.kmText} (${shopDistance.metersText}) away`}
+                                    {shopDistance.awayText}
                                   </Text>
                                 </View>
                               </View>
