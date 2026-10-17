@@ -3,6 +3,7 @@ import { cacheResponse, invalidateCache } from '../middleware/cache';
 import { prisma } from '../lib/prisma';
 import { createAndSendNotification } from '../services/notificationService';
 import { deleteCloudflareImage, handleImageReplacement } from '../utils/cloudflareImages';
+import { deduplicateDatabase } from '../services/deduplicationService';
 
 const router = express.Router();
 
@@ -313,6 +314,21 @@ const getCategoryEmoji = (category: string): string => {
   return '🛠️';
 };
 
+// Maintenance trigger: Deduplicate all database records
+router.all('/cleanup-duplicates', async (req, res) => {
+  try {
+    const report = await deduplicateDatabase();
+    invalidateCache('/marketplace');
+    invalidateCache('/shops');
+    invalidateCache('/services');
+    invalidateCache('/transport');
+    invalidateCache('/deals');
+    res.json({ success: true, message: 'Database deduplication completed', report });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Deduplication failed' });
+  }
+});
+
 // GET /api/marketplace/popular - Returns popular shops selected by admin
 router.get('/popular', async (req, res) => {
   try {
@@ -326,7 +342,7 @@ router.get('/popular', async (req, res) => {
         _count: { select: { products: true } },
       },
       orderBy: { createdAt: 'desc' },
-      take: limit,
+      take: limit * 2,
     });
 
     // Format so it satisfies both ShopItem and PopularItem interfaces
@@ -357,7 +373,19 @@ router.get('/popular', async (req, res) => {
       popularity: 80 + (shop._count.products * 12),
     }));
 
-    res.json(formatted);
+    // In-memory deduplication by name
+    const uniquePopular: typeof formatted = [];
+    const seen = new Set<string>();
+    for (const item of formatted) {
+      const key = (item.name || item.title || '').trim().toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniquePopular.push(item);
+        if (uniquePopular.length >= limit) break;
+      }
+    }
+
+    res.json(uniquePopular);
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to fetch popular shops' });
   }
@@ -381,7 +409,19 @@ router.get('/digital-services', cacheResponse(300), async (req, res) => {
       where: whereCondition,
       orderBy: { createdAt: 'asc' },
     });
-    res.json(services);
+
+    // In-memory deduplication by name
+    const uniqueServices: typeof services = [];
+    const seen = new Set<string>();
+    for (const item of services) {
+      const key = item.name.trim().toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueServices.push(item);
+      }
+    }
+
+    res.json(uniqueServices);
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to fetch digital services' });
   }
@@ -396,7 +436,19 @@ router.get('/category-tiles', cacheResponse(300), async (req, res) => {
       where: whereCondition,
       orderBy: { createdAt: 'asc' },
     });
-    res.json(tiles);
+
+    // In-memory deduplication by type + name
+    const uniqueTiles: typeof tiles = [];
+    const seen = new Set<string>();
+    for (const tile of tiles) {
+      const key = `${tile.type.trim().toLowerCase()}:${tile.name.trim().toLowerCase()}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueTiles.push(tile);
+      }
+    }
+
+    res.json(uniqueTiles);
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to fetch category tiles' });
   }
@@ -415,7 +467,7 @@ router.get('/featured-services', async (req, res) => {
         { isSponsored: 'desc' },
         { createdAt: 'desc' },
       ],
-      take: limit,
+      take: limit * 2,
     });
 
     const formatted = services.map((s) => ({
@@ -441,7 +493,19 @@ router.get('/featured-services', async (req, res) => {
       emoji: getCategoryEmoji(s.category),
     }));
 
-    res.json(formatted);
+    // In-memory deduplication by name + provider
+    const uniqueFeatured: typeof formatted = [];
+    const seen = new Set<string>();
+    for (const f of formatted) {
+      const key = `${(f.name || f.title || '').trim().toLowerCase()}:${(f.provider || f.providerName || '').trim().toLowerCase()}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueFeatured.push(f);
+        if (uniqueFeatured.length >= limit) break;
+      }
+    }
+
+    res.json(uniqueFeatured);
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to fetch featured services' });
   }
@@ -476,7 +540,19 @@ router.get('/digital-providers', cacheResponse(120), async (req, res) => {
       where: whereCondition,
       orderBy: { createdAt: 'desc' },
     });
-    res.json(providers);
+
+    // In-memory deduplication by serviceType + name
+    const uniqueProviders: typeof providers = [];
+    const seen = new Set<string>();
+    for (const p of providers) {
+      const key = `${p.serviceType.trim().toLowerCase()}:${p.name.trim().toLowerCase()}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueProviders.push(p);
+      }
+    }
+
+    res.json(uniqueProviders);
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to fetch digital service providers' });
   }

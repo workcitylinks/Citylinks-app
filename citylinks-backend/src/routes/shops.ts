@@ -125,9 +125,20 @@ router.get('/', cacheResponse(60), async (req, res) => {
       orderBy: { createdAt: 'desc' },
     });
 
+    // In-memory deduplication by shop name
+    const uniqueShops: typeof shops = [];
+    const seenShops = new Set<string>();
+    for (const s of shops) {
+      const key = s.name.trim().toLowerCase();
+      if (!seenShops.has(key)) {
+        seenShops.add(key);
+        uniqueShops.push(s);
+      }
+    }
+
     const isPhoneDisplayAllowed = getShopPhoneDisplayEnabled();
 
-    const enrichedShops = shops.map((shop, idx) => {
+    const enrichedShops = uniqueShops.map((shop, idx) => {
       const baseLat = 14.7960 + ((idx % 7) * 0.0014);
       const baseLng = 75.3995 + (((idx * 3) % 8) * 0.0012);
       return {
@@ -525,10 +536,22 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Shop not found' });
     }
 
+    // Deduplicate products by name
+    const uniqueProducts: typeof shop.products = [];
+    const seenProd = new Set<string>();
+    for (const prod of shop.products) {
+      const pKey = prod.name.trim().toLowerCase();
+      if (!seenProd.has(pKey)) {
+        seenProd.add(pKey);
+        uniqueProducts.push(prod);
+      }
+    }
+
     const isPhoneDisplayAllowed = getShopPhoneDisplayEnabled();
 
     res.json({
       ...shop,
+      products: uniqueProducts,
       phone: isPhoneDisplayAllowed ? shop.phone : null,
       showPhone: isPhoneDisplayAllowed,
     });

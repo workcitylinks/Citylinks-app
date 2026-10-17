@@ -123,8 +123,22 @@ export function useShops(rawQuery: string = '', category: string = 'All') {
     ]);
   };
 
+  const rawShops = query.data || [];
+  const shops = useMemo(() => {
+    const unique: ShopItem[] = [];
+    const seen = new Set<string>();
+    for (const s of rawShops) {
+      const key = s.name.trim().toLowerCase();
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        unique.push(s);
+      }
+    }
+    return unique;
+  }, [rawShops]);
+
   return {
-    shops: query.data || [],
+    shops,
     categories: categoriesQuery.data || ['All', 'Apparel', 'Automobile', 'Electronics', 'Groceries', 'Retail', 'Hardware'],
     loading: query.loading,
     refreshing: query.refreshing || categoriesQuery.refreshing,
@@ -191,8 +205,22 @@ export function useServices(category: string = 'All', rawQuery: string = '') {
     ]);
   };
 
+  const rawServices = query.data || [];
+  const services = useMemo(() => {
+    const unique: ServiceItem[] = [];
+    const seen = new Set<string>();
+    for (const s of rawServices) {
+      const key = `${s.title.trim().toLowerCase()}:${(s.providerName || '').trim().toLowerCase()}`;
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        unique.push(s);
+      }
+    }
+    return unique;
+  }, [rawServices]);
+
   return {
-    services: query.data || [],
+    services,
     categories: categoriesQuery.data || ['All', 'Plumbing', 'Electrician', 'Cleaning', 'Painting', 'Salon', 'Carpentry', 'General', 'Others'],
     loading: query.loading || categoriesQuery.loading,
     refreshing: query.refreshing || categoriesQuery.refreshing,
@@ -336,8 +364,22 @@ export function useDigitalServices(rawQuery: string = '') {
     persist: true,
   });
 
+  const rawDigital = query.data || [];
+  const digitalServices = useMemo(() => {
+    const unique: DigitalServiceItem[] = [];
+    const seen = new Set<string>();
+    for (const item of rawDigital) {
+      const key = item.name.trim().toLowerCase();
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        unique.push(item);
+      }
+    }
+    return unique;
+  }, [rawDigital]);
+
   return {
-    digitalServices: query.data || [],
+    digitalServices,
     loading: query.loading,
     refreshing: query.refreshing,
     error: query.error,
@@ -362,8 +404,22 @@ export function useDigitalProviders(serviceType: string = 'All', rawQuery: strin
     persist: true,
   });
 
+  const rawProviders = query.data || [];
+  const providers = useMemo(() => {
+    const unique: DigitalServiceProviderItem[] = [];
+    const seen = new Set<string>();
+    for (const p of rawProviders) {
+      const key = `${p.serviceType.trim().toLowerCase()}:${p.name.trim().toLowerCase()}`;
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        unique.push(p);
+      }
+    }
+    return unique;
+  }, [rawProviders]);
+
   return {
-    providers: query.data || [],
+    providers,
     loading: query.loading,
     refreshing: query.refreshing,
     error: query.error,
@@ -460,9 +516,80 @@ export function useMarketplaceHome(preloadedPopular: PopularItem[] = []) {
     persist: false,
   });
 
+  const rawPopular = popularQuery.data !== null ? popularQuery.data : preloadedPopular;
+  const popularItems = useMemo(() => {
+    const unique: PopularItem[] = [];
+    const seen = new Set<string>();
+    for (const item of rawPopular) {
+      const key = (item.name || item.title || item.id || '').trim().toLowerCase();
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        unique.push(item);
+      }
+    }
+    return unique;
+  }, [rawPopular]);
+
+  const rawDigital = digitalQuery.data || [];
+  const digitalServices = useMemo(() => {
+    const unique: DigitalServiceItem[] = [];
+    const seen = new Set<string>();
+    for (const item of rawDigital) {
+      const key = item.name.trim().toLowerCase();
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        unique.push(item);
+      }
+    }
+    return unique;
+  }, [rawDigital]);
+
   const tiles = tilesQuery.data || [];
-  const serviceTiles = useMemo(() => tiles.filter((t) => t.type === 'service_tile'), [tiles]);
-  const shopCategories = useMemo(() => tiles.filter((t) => t.type === 'shop_category'), [tiles]);
+  const serviceTiles = useMemo(() => {
+    const unique: CategoryTileItem[] = [];
+    const seen = new Set<string>();
+    for (const t of tiles) {
+      if (t.type === 'service_tile') {
+        const key = t.name.trim().toLowerCase();
+        if (key && !seen.has(key)) {
+          seen.add(key);
+          unique.push(t);
+        }
+      }
+    }
+    return unique;
+  }, [tiles]);
+
+  const shopCategories = useMemo(() => {
+    const unique: CategoryTileItem[] = [];
+    const seen = new Set<string>();
+    for (const t of tiles) {
+      if (t.type === 'shop_category') {
+        const key = t.name.trim().toLowerCase();
+        if (key && !seen.has(key)) {
+          seen.add(key);
+          unique.push(t);
+        }
+      }
+    }
+    return unique;
+  }, [tiles]);
+
+  const rawFeatured = featuredQuery.data || [];
+  const featuredServices = useMemo(() => {
+    const unique: FeaturedServiceItem[] = [];
+    const seen = new Set<string>();
+    for (const item of rawFeatured) {
+      const name = (item.name || item.title || '').trim().toLowerCase();
+      const prov = (item.provider || item.providerName || '').trim().toLowerCase();
+      const key = `${name}:${prov}`;
+      if (key !== ':' && !seen.has(key)) {
+        seen.add(key);
+        unique.push(item);
+      }
+    }
+    return unique;
+  }, [rawFeatured]);
 
   const { refetch: refetchPopular } = popularQuery;
   const { refetch: refetchDigital } = digitalQuery;
@@ -479,11 +606,11 @@ export function useMarketplaceHome(preloadedPopular: PopularItem[] = []) {
   }, [refetchPopular, refetchDigital, refetchTiles, refetchFeatured]);
 
   return {
-    popularItems: popularQuery.data !== null ? popularQuery.data : preloadedPopular,
-    digitalServices: digitalQuery.data || [],
+    popularItems,
+    digitalServices,
     serviceTiles,
     shopCategories,
-    featuredServices: featuredQuery.data || [],
+    featuredServices,
     loading: popularQuery.loading && (preloadedPopular.length === 0),
     refreshing: popularQuery.refreshing || digitalQuery.refreshing || tilesQuery.refreshing || featuredQuery.refreshing,
     refetch,

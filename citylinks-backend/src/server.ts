@@ -22,9 +22,12 @@ import adminRoutes from './routes/admin';
 import orderRoutes from './routes/orders';
 import uploadRoutes from './routes/upload';
 import { seedAll } from '../prisma/seed';
+import { deduplicateDatabase } from './services/deduplicationService';
 
-// Ensure database is completely seeded on startup
-seedAll().catch((err) => console.error('[Server Seed Error]:', err));
+// Ensure database is completely seeded and deduplicated on startup
+seedAll()
+  .then(() => deduplicateDatabase())
+  .catch((err) => console.error('[Server Seed/Deduplication Error]:', err));
 
 app.use(cors());
 app.use(express.json({ limit: '15mb' }));

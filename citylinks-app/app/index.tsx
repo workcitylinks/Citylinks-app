@@ -255,7 +255,7 @@ export default function Index() {
   const matchingCategoryShops = useMemo(() => {
     if (!selectedShopCategory) return [];
     const target = selectedShopCategory.trim().toLowerCase();
-    return allShops.filter((s: any) => {
+    const filtered = allShops.filter((s: any) => {
       const cat = (s.category || '').toLowerCase();
       const name = (s.name || '').toLowerCase();
       if (cat.includes(target) || name.includes(target)) return true;
@@ -273,6 +273,17 @@ export default function Index() {
       }
       return false;
     });
+
+    const unique: typeof filtered = [];
+    const seen = new Set<string>();
+    for (const shop of filtered) {
+      const key = (shop.name || '').trim().toLowerCase();
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        unique.push(shop);
+      }
+    }
+    return unique;
   }, [allShops, selectedShopCategory]);
 
   const userInitial = userData?.fullName?.trim()
@@ -1148,7 +1159,7 @@ export default function Index() {
                     const IconComponent = ICON_MAP[service.iconName] || Globe;
                     return (
                       <TouchableOpacity
-                        key={service.id || i}
+                        key={service.id || service.name || i}
                         activeOpacity={0.7}
                         onPress={() => handleProtectedAction(() => router.push({
                           pathname: '/digital-services',
@@ -1212,7 +1223,7 @@ export default function Index() {
 
                     return (
                       <TouchableOpacity
-                        key={tile.id || i}
+                        key={tile.id || tile.name || i}
                         activeOpacity={0.7}
                         onPress={handleTilePress}
                         className="w-[22%] items-center mb-4"
@@ -1256,7 +1267,7 @@ export default function Index() {
 
                     return (
                       <TouchableOpacity
-                        key={cat.id || i}
+                        key={cat.id || cat.name || i}
                         activeOpacity={0.8}
                         onPress={() => {
                           setSelectedShopCategory(isSelected ? null : cat.name);

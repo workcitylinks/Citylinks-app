@@ -186,7 +186,18 @@ router.get('/', cacheResponse(120), async (req, res) => {
       orderBy: { createdAt: 'desc' },
     });
 
-    res.json(services);
+    // In-memory deduplication by title + providerName
+    const uniqueServices: typeof services = [];
+    const seen = new Set<string>();
+    for (const s of services) {
+      const key = `${s.title.trim().toLowerCase()}:${(s.providerName || '').trim().toLowerCase()}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueServices.push(s);
+      }
+    }
+
+    res.json(uniqueServices);
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to fetch services' });
   }
